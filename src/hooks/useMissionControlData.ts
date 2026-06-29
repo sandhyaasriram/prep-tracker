@@ -348,6 +348,7 @@ export interface UseMissionControlDataResult {
   loading: boolean;
   error: string | null;
   toggleMissionTask: (taskId: string) => void;
+  refresh: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 export function useMissionControlData(userId: string | null): UseMissionControlDataResult {
@@ -356,7 +357,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
   const [error, setError] = useState<string | null>(null);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
 
-  const refresh = useCallback(async (): Promise<void> => {
+  const refresh = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
       setData(null);
       setLoading(false);
@@ -364,7 +365,9 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
       return;
     }
 
-    setLoading(true);
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -486,7 +489,9 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
       setData(buildFallbackMissionControlData());
       setCompletedTaskIds(new Set());
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }, [userId]);
 
@@ -527,5 +532,6 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
     loading,
     error,
     toggleMissionTask,
+    refresh,
   };
 }

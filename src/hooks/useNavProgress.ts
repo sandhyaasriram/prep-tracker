@@ -64,6 +64,9 @@ export function useNavProgress(userId: string | null, route: AppNavRoute): NavPr
         return;
       }
 
+      // Applications top-bar progress (swap metric here anytime).
+      // Current: % of tracked apps that moved past Wishlist (Applied / OA / Interview / Offer / Rejected).
+      // Alternatives: apps applied ÷ target_companies from user_settings, or stage-weighted pipeline score.
       if (route === 'Applications') {
         const { data, error } = await supabase.from('applications').select('stage').eq('user_id', userId);
 
@@ -97,6 +100,70 @@ export function useNavProgress(userId: string | null, route: AppNavRoute): NavPr
         setNavProgress({
           progress,
           label: `CS fundamentals: ${strong}/${items.length} marked strong`,
+        });
+        return;
+      }
+
+      if (route === 'Projects') {
+        const [projectsResult, checklistResult] = await Promise.all([
+          supabase.from('projects').select('id, type').eq('user_id', userId),
+          supabase.from('project_checklist').select('completed, project_id'),
+        ]);
+
+        if (projectsResult.error) throw projectsResult.error;
+        if (checklistResult.error) throw checklistResult.error;
+
+        const existingIds = new Set(
+          ((projectsResult.data ?? []) as Array<{ id: string; type: string }>)
+            .filter((project) => project.type === 'existing')
+            .map((project) => project.id)
+        );
+        const checklist = (checklistResult.data ?? []) as Array<{ completed: boolean; project_id: string }>;
+        const relevant = checklist.filter((item) => existingIds.has(item.project_id));
+        const done = relevant.filter((item) => item.completed).length;
+        const progress = relevant.length > 0 ? Math.round((done / relevant.length) * 100) : 0;
+
+        setNavProgress({
+          progress,
+          label: `Resume checklist: ${done}/${relevant.length} items done`,
+        });
+        return;
+      }
+
+      if (route === 'Certifications') {
+        const { data, error } = await supabase.from('certifications').select('status, progress').eq('user_id', userId);
+
+        if (error) throw error;
+
+        const certs = (data ?? []) as Array<{ status: string; progress: number }>;
+        const inProgress = certs.filter((cert) => cert.status === 'In Progress');
+
+        if (inProgress.length === 0) {
+          const completed = certs.filter((cert) => cert.status === 'Completed').length;
+          setNavProgress({
+            progress: certs.length > 0 ? Math.round((completed / certs.length) * 100) : 0,
+            label: `Certifications: ${completed}/${certs.length} completed`,
+          });
+          return;
+        }
+
+        const average = Math.round(inProgress.reduce((sum, cert) => sum + cert.progress, 0) / inProgress.length);
+        setNavProgress({
+          progress: average,
+          label: `Certification progress: ${average}% average`,
+        });
+        return;
+      }
+
+      if (route === 'Journal') {
+        const { data, error } = await supabase.from('journal_entries').select('date').eq('user_id', userId);
+
+        if (error) throw error;
+
+        const entryCount = (data ?? []).length;
+        setNavProgress({
+          progress: Math.min(entryCount * 5, 100),
+          label: `Journal: ${entryCount} entries logged`,
         });
         return;
       }

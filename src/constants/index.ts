@@ -62,6 +62,14 @@ export const PROJECT_STATUS = {
   ARCHIVED: 'Archived',
 } as const;
 
+export const PROJECT_CHECKLIST_ITEMS = [
+  'README done',
+  'Deployed',
+  'Added to resume',
+  'LinkedIn post',
+  'Demo video',
+] as const;
+
 export const MOCK_TYPES = {
   BEHAVIOURAL: 'Behavioural',
   DSA: 'DSA',

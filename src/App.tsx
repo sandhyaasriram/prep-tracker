@@ -8,6 +8,9 @@ import { MissionControlPage } from '@/pages/MissionControlPage';
 import { DSAPage } from '@/pages/DSAPage';
 import { ApplicationsPage } from '@/pages/ApplicationsPage';
 import { InterviewPrepPage } from '@/pages/InterviewPrepPage';
+import { ProjectsPage } from '@/pages/ProjectsPage';
+import { CertificationsPage } from '@/pages/CertificationsPage';
+import { JournalPage } from '@/pages/JournalPage';
 import { PlaceholderPage } from '@/pages/placeholderRoutes';
 import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui';
@@ -16,7 +19,17 @@ import { useNavProgress } from '@/hooks/useNavProgress';
 import { useSeedUserData } from '@/hooks/useSeedUserData';
 import { useEffect, useState } from 'react';
 
-type HashRoute = '' | 'dsa' | 'applications' | 'interview-prep' | 'weekly-review' | 'timeline' | 'settings';
+type HashRoute =
+  | ''
+  | 'dsa'
+  | 'applications'
+  | 'interview-prep'
+  | 'projects'
+  | 'certifications'
+  | 'journal'
+  | 'weekly-review'
+  | 'timeline'
+  | 'settings';
 
 export default function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth();
@@ -40,6 +53,21 @@ export default function App() {
 
       if (hash === 'interview-prep') {
         setRoute('Interview Prep');
+        return;
+      }
+
+      if (hash === 'projects') {
+        setRoute('Projects');
+        return;
+      }
+
+      if (hash === 'certifications') {
+        setRoute('Certifications');
+        return;
+      }
+
+      if (hash === 'journal') {
+        setRoute('Journal');
         return;
       }
 
@@ -127,6 +155,12 @@ export default function App() {
         return <ApplicationsPage user={user} />;
       case 'Interview Prep':
         return <InterviewPrepPage user={user} />;
+      case 'Projects':
+        return <ProjectsPage user={user} />;
+      case 'Certifications':
+        return <CertificationsPage user={user} />;
+      case 'Journal':
+        return <JournalPage user={user} />;
       case 'Weekly Review':
         return <PlaceholderPage title="Weekly Review" description="This section will be built in Phase 10." user={user} />;
       case 'Timeline':
@@ -157,6 +191,18 @@ export default function App() {
         }
         if (nextRoute === 'Interview Prep') {
           window.location.hash = 'interview-prep';
+          return;
+        }
+        if (nextRoute === 'Projects') {
+          window.location.hash = 'projects';
+          return;
+        }
+        if (nextRoute === 'Certifications') {
+          window.location.hash = 'certifications';
+          return;
+        }
+        if (nextRoute === 'Journal') {
+          window.location.hash = 'journal';
           return;
         }
         if (nextRoute === 'Weekly Review') {

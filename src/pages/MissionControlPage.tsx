@@ -3,7 +3,7 @@
  * Shows the daily command center, weekly progress, deadlines, and recent activity.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   CheckCircle2,
@@ -28,8 +28,11 @@ interface MissionControlPageProps {
  * Primary landing page after authentication.
  */
 export function MissionControlPage({ user }: MissionControlPageProps) {
-  const { data, loading, error, toggleMissionTask } = useMissionControlData(user.id);
+  const { data, loading, error, toggleMissionTask, refresh } = useMissionControlData(user.id);
   const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
+  const [isRefreshingDeadlines, setIsRefreshingDeadlines] = useState(false);
+  const [phaseMenuOpen, setPhaseMenuOpen] = useState(false);
+  const phaseMenuRef = useRef<HTMLDivElement>(null);
 
   const displayName = data?.firstName ?? profileSeed.name.split(' ')[0] ?? profileSeed.name;
   const currentPhase = data?.currentPhase ?? getCurrentPhase(profileSeed.phase_schedule);
@@ -41,6 +44,35 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
     setQuickCaptureMessage('Quick Capture is coming in Phase 11.');
     window.setTimeout(() => setQuickCaptureMessage(null), 2500);
   };
+
+  const handleRefreshDeadlines = async (): Promise<void> => {
+    setIsRefreshingDeadlines(true);
+    try {
+      await refresh({ silent: true });
+    } finally {
+      setIsRefreshingDeadlines(false);
+    }
+  };
+
+  const handleOpenTimeline = (): void => {
+    setPhaseMenuOpen(false);
+    window.location.hash = 'timeline';
+  };
+
+  useEffect(() => {
+    if (!phaseMenuOpen) {
+      return;
+    }
+
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (phaseMenuRef.current && !phaseMenuRef.current.contains(event.target as Node)) {
+        setPhaseMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [phaseMenuOpen]);
 
   if (loading || !data) {
     return (
@@ -202,7 +234,16 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
                   <p className="text-sm font-medium text-[#7A736B] dark:text-[#6B7280]">Upcoming deadlines</p>
                   <p className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Next 14 days</p>
                 </div>
-                <RefreshCw size={14} className="text-[#7A736B] dark:text-[#6B7280]" />
+                <button
+                  type="button"
+                  onClick={() => void handleRefreshDeadlines()}
+                  disabled={isRefreshingDeadlines}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#7A736B] transition-colors duration-150 hover:bg-[#F3F0EB] hover:text-[#1A1614] disabled:opacity-50 dark:text-[#6B7280] dark:hover:bg-[#1C2028] dark:hover:text-[#E8EDF2]"
+                  aria-label="Refresh upcoming deadlines"
+                  title="Refresh deadlines"
+                >
+                  <RefreshCw size={14} className={isRefreshingDeadlines ? 'animate-spin' : ''} />
+                </button>
               </div>
             </CardHeader>
             <CardBody className="space-y-3">
@@ -231,7 +272,29 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
                   <p className="text-sm font-medium text-[#7A736B] dark:text-[#6B7280]">Phase timeline</p>
                   <p className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Placement season</p>
                 </div>
-                <MoreVertical size={14} className="text-[#7A736B] dark:text-[#6B7280]" />
+                <div className="relative" ref={phaseMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setPhaseMenuOpen((open) => !open)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#7A736B] transition-colors duration-150 hover:bg-[#F3F0EB] hover:text-[#1A1614] dark:text-[#6B7280] dark:hover:bg-[#1C2028] dark:hover:text-[#E8EDF2]"
+                    aria-label="Phase timeline options"
+                    aria-expanded={phaseMenuOpen}
+                    title="Phase options"
+                  >
+                    <MoreVertical size={14} />
+                  </button>
+                  {phaseMenuOpen && (
+                    <div className="absolute right-0 top-full z-20 mt-1 min-w-[160px] rounded-lg border border-[#E8E3DC] bg-white py-1 shadow-lg dark:border-[#232830] dark:bg-[#13161A]">
+                      <button
+                        type="button"
+                        onClick={handleOpenTimeline}
+                        className="block w-full px-3 py-2 text-left text-sm text-[#1A1614] transition-colors hover:bg-[#F3F0EB] dark:text-[#E8EDF2] dark:hover:bg-[#1C2028]"
+                      >
+                        View full timeline
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardBody className="space-y-3">

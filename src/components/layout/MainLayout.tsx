@@ -4,13 +4,23 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic } from 'lucide-react';
+import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic, Layers, Award, PenLine } from 'lucide-react';
 import { Sidebar, SidebarItem, TopNav } from '@/components';
 import { Button } from '@/components/ui';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/storage';
 import type { User } from '@supabase/supabase-js';
 
-export type AppNavRoute = 'Dashboard' | 'DSA' | 'Applications' | 'Interview Prep' | 'Weekly Review' | 'Timeline' | 'Settings';
+export type AppNavRoute =
+  | 'Dashboard'
+  | 'DSA'
+  | 'Applications'
+  | 'Interview Prep'
+  | 'Projects'
+  | 'Certifications'
+  | 'Journal'
+  | 'Weekly Review'
+  | 'Timeline'
+  | 'Settings';
 
 interface MainLayoutProps {
   user: User;
@@ -27,6 +37,9 @@ const navigationItems: Array<{ label: AppNavRoute; icon: typeof LayoutDashboard 
   { label: 'DSA', icon: Target },
   { label: 'Applications', icon: FolderKanban },
   { label: 'Interview Prep', icon: Mic },
+  { label: 'Projects', icon: Layers },
+  { label: 'Certifications', icon: Award },
+  { label: 'Journal', icon: PenLine },
   { label: 'Weekly Review', icon: BookOpen },
   { label: 'Timeline', icon: CalendarDays },
   { label: 'Settings', icon: Settings },
