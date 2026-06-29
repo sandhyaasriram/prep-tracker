@@ -1,0 +1,164 @@
+/**
+ * Root App component for Placement OS.
+ * Manages authentication state, seeding, and phase-based screen switching.
+ */
+
+import { LoginPage } from '@/pages/LoginPage';
+import { MissionControlPage } from '@/pages/MissionControlPage';
+import { DSAPage } from '@/pages/DSAPage';
+import { PlaceholderPage } from '@/pages/placeholderRoutes';
+import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
+import { Button } from '@/components/ui';
+import { useAuth } from '@/hooks/useAuth';
+import { useSeedUserData } from '@/hooks/useSeedUserData';
+import { useEffect, useState } from 'react';
+
+type HashRoute = '' | 'dsa' | 'applications' | 'weekly-review' | 'timeline' | 'settings';
+
+export default function App() {
+  const { user, loading, signIn, signUp, signOut } = useAuth();
+  const { seeding, error: seedError, retry: retrySeed, dismissError: dismissSeedError } = useSeedUserData(user?.id ?? null);
+  const [route, setRoute] = useState<AppNavRoute>('Dashboard');
+  const [seedErrorDismissed, setSeedErrorDismissed] = useState(false);
+
+  useEffect(() => {
+    const syncRoute = (): void => {
+      const hash = window.location.hash.replace('#', '') as HashRoute;
+      if (hash === 'dsa') {
+        setRoute('DSA');
+        return;
+      }
+
+      if (hash === 'applications') {
+        setRoute('Applications');
+        return;
+      }
+
+      if (hash === 'weekly-review') {
+        setRoute('Weekly Review');
+        return;
+      }
+
+      if (hash === 'timeline') {
+        setRoute('Timeline');
+        return;
+      }
+
+      if (hash === 'settings') {
+        setRoute('Settings');
+        return;
+      }
+
+      setRoute('Dashboard');
+    };
+
+    syncRoute();
+    window.addEventListener('hashchange', syncRoute);
+    return () => window.removeEventListener('hashchange', syncRoute);
+  }, []);
+
+  if (loading || seeding) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] dark:bg-[#0D0F12]">
+        <div className="space-y-3 text-center">
+          <h1 className="font-display text-4xl text-[#1A1614] dark:text-[#E8EDF2]">Placement OS</h1>
+          <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">{loading ? 'Checking authentication...' : 'Seeding your workspace...'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (seedError && !seedErrorDismissed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] px-6 dark:bg-[#0D0F12]">
+        <div className="max-w-lg rounded-2xl border border-[#E8622A]/30 bg-white p-6 text-left shadow-sm dark:border-[#E8622A]/30 dark:bg-[#13161A]">
+          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Placement OS</h1>
+          <p className="mt-3 text-sm text-[#7A736B] dark:text-[#6B7280]">Seeding hit a problem:</p>
+          <p className="mt-2 rounded-xl border border-[#E8622A]/20 bg-[#E8622A]/5 px-3 py-2 text-sm text-[#1A1614] dark:text-[#E8EDF2]">
+            {seedError}
+          </p>
+          <p className="mt-3 text-sm text-[#7A736B] dark:text-[#6B7280]">
+            If this is your first setup, open the Supabase SQL editor and run <code className="font-mono text-xs">supabase/schema.sql</code>, then retry.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                setSeedErrorDismissed(false);
+                retrySeed();
+              }}
+            >
+              Retry seeding
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                dismissSeedError();
+                setSeedErrorDismissed(true);
+              }}
+            >
+              Continue anyway
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage onSignIn={signIn} onSignUp={signUp} />;
+  }
+
+  const renderRoute = (): JSX.Element => {
+    switch (route) {
+      case 'DSA':
+        return <DSAPage user={user} />;
+      case 'Applications':
+        return <PlaceholderPage title="Applications" description="This section will be built in Phase 7." user={user} />;
+      case 'Weekly Review':
+        return <PlaceholderPage title="Weekly Review" description="This section will be built in Phase 10." user={user} />;
+      case 'Timeline':
+        return <PlaceholderPage title="Timeline" description="This section will be built in Phase 10." user={user} />;
+      case 'Settings':
+        return <PlaceholderPage title="Settings" description="This section will be built in Phase 10." user={user} />;
+      case 'Dashboard':
+      default:
+        return <MissionControlPage user={user} />;
+    }
+  };
+
+  return (
+    <MainLayout
+      user={user}
+      progressPercentage={route === 'DSA' ? 40 : 25}
+      onSignOut={signOut}
+      activeRoute={route}
+      onNavigate={(nextRoute) => {
+        if (nextRoute === 'DSA') {
+          window.location.hash = 'dsa';
+          return;
+        }
+        if (nextRoute === 'Applications') {
+          window.location.hash = 'applications';
+          return;
+        }
+        if (nextRoute === 'Weekly Review') {
+          window.location.hash = 'weekly-review';
+          return;
+        }
+        if (nextRoute === 'Timeline') {
+          window.location.hash = 'timeline';
+          return;
+        }
+        if (nextRoute === 'Settings') {
+          window.location.hash = 'settings';
+          return;
+        }
+        window.location.hash = '';
+      }}
+    >
+      {renderRoute()}
+    </MainLayout>
+  );
+}

@@ -1,0 +1,24 @@
+{
+  "weeks": [
+    { "week_number": 1, "start_date": "2026-07-07", "end_date": "2026-07-13", "category": "DSA", "goal_text": "Finish Arrays revision block and solve 6 mixed array problems.", "completed": false, "notes": "" },
+    { "week_number": 2, "start_date": "2026-07-14", "end_date": "2026-07-20", "category": "Applications", "goal_text": "Prepare resume base and shortlist 20 target companies for opening wave.", "completed": false, "notes": "" },
+    { "week_number": 3, "start_date": "2026-07-21", "end_date": "2026-07-27", "category": "Projects", "goal_text": "Update project README drafts and deployment notes for the top 2 projects.", "completed": false, "notes": "" },
+    { "week_number": 4, "start_date": "2026-07-28", "end_date": "2026-08-03", "category": "Certifications", "goal_text": "Complete first AWS SAA module block and take one practice quiz.", "completed": false, "notes": "" },
+    { "week_number": 5, "start_date": "2026-08-04", "end_date": "2026-08-10", "category": "DSA", "goal_text": "Focus on Binary Search and Sliding Window patterns with timed practice.", "completed": false, "notes": "" },
+    { "week_number": 6, "start_date": "2026-08-11", "end_date": "2026-08-17", "category": "Interview Prep", "goal_text": "Run one mock interview and review weak CS fundamentals topics.", "completed": false, "notes": "" },
+    { "week_number": 7, "start_date": "2026-08-18", "end_date": "2026-08-24", "category": "Applications", "goal_text": "Send referral asks and submit applications to the first 10 priority companies.", "completed": false, "notes": "" },
+    { "week_number": 8, "start_date": "2026-08-25", "end_date": "2026-08-31", "category": "Projects", "goal_text": "Polish one flagship project and prepare a demo video script.", "completed": false, "notes": "" },
+    { "week_number": 9, "start_date": "2026-09-01", "end_date": "2026-09-07", "category": "DSA", "goal_text": "Enter Trees and Graphs revision block with focus on BFS, DFS, and recursion.", "completed": false, "notes": "" },
+    { "week_number": 10, "start_date": "2026-09-08", "end_date": "2026-09-14", "category": "Interview Prep", "goal_text": "Take one OA-style timed practice set and log topic misses.", "completed": false, "notes": "" },
+    { "week_number": 11, "start_date": "2026-09-15", "end_date": "2026-09-21", "category": "Applications", "goal_text": "Track peak-season openings daily and update application statuses promptly.", "completed": false, "notes": "" },
+    { "week_number": 12, "start_date": "2026-09-22", "end_date": "2026-09-28", "category": "DSA", "goal_text": "Push Dynamic Programming practice and revise 2 older hard problems.", "completed": false, "notes": "" },
+    { "week_number": 13, "start_date": "2026-09-29", "end_date": "2026-10-05", "category": "Certifications", "goal_text": "Hold certification momentum and finish the next AWS module checkpoint.", "completed": false, "notes": "" },
+    { "week_number": 14, "start_date": "2026-10-06", "end_date": "2026-10-12", "category": "Interview Prep", "goal_text": "Complete one behavioral mock and tighten stories for top companies.", "completed": false, "notes": "" },
+    { "week_number": 15, "start_date": "2026-10-13", "end_date": "2026-10-19", "category": "Applications", "goal_text": "Follow up on open processes and prepare interview round notes.", "completed": false, "notes": "" },
+    { "week_number": 16, "start_date": "2026-10-20", "end_date": "2026-10-26", "category": "DSA", "goal_text": "Run a mixed revision week across all weak topics flagged in the last month.", "completed": false, "notes": "" },
+    { "week_number": 17, "start_date": "2026-10-27", "end_date": "2026-11-02", "category": "Projects", "goal_text": "Keep one project ready for resume spotlight and one as backup.", "completed": false, "notes": "" },
+    { "week_number": 18, "start_date": "2026-11-03", "end_date": "2026-11-09", "category": "Interview Prep", "goal_text": "Do one full technical mock and one OA logging session.", "completed": false, "notes": "" },
+    { "week_number": 19, "start_date": "2026-11-10", "end_date": "2026-11-16", "category": "Applications", "goal_text": "Close out peak-season applications and capture learnings in the weekly review.", "completed": false, "notes": "" },
+    { "week_number": 20, "start_date": "2026-11-17", "end_date": "2026-11-23", "category": "Personal", "goal_text": "Stabilize revision routine and prepare for late-season follow-ups and offers.", "completed": false, "notes": "" }
+  ]
+}

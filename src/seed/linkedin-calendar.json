@@ -1,0 +1,16 @@
+{
+  "weeks": [
+    { "week_number": 1, "topic": "Placement OS launch", "angle": "Share the personal system you are building for consistency and focus." },
+    { "week_number": 2, "topic": "DSA preparation", "angle": "Share a short reflection on patterns and revision discipline." },
+    { "week_number": 3, "topic": "Project storytelling", "angle": "Explain one project problem, the constraints, and the outcome." },
+    { "week_number": 4, "topic": "Resume lessons", "angle": "Share what changed in the latest resume draft and why." },
+    { "week_number": 5, "topic": "AWS preparation", "angle": "Write about one cloud concept that clicked during study." },
+    { "week_number": 6, "topic": "Mock interview reflection", "angle": "Share one thing that improved and one thing still weak." },
+    { "week_number": 7, "topic": "Peak season prep", "angle": "Show how you are preparing for live applications and interviews." },
+    { "week_number": 8, "topic": "Project deployment", "angle": "Describe what it took to make a project production-ready." },
+    { "week_number": 9, "topic": "Graphs and DP learning", "angle": "Share a concise breakdown of how you are approaching hard patterns." },
+    { "week_number": 10, "topic": "Cert progress", "angle": "Document a milestone and why the certification matters to your goals." },
+    { "week_number": 11, "topic": "OA preparation", "angle": "Write about what a strong OA routine looks like for you." },
+    { "week_number": 12, "topic": "Interview stories", "angle": "Share a behavior story framework that you refined." }
+  ]
+}

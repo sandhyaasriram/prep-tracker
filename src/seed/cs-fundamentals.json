@@ -1,0 +1,20 @@
+{
+  "topics": [
+    {
+      "topic": "OS",
+      "subtopics": ["Processes & Threads", "Scheduling", "Memory Management", "Deadlocks", "File Systems"]
+    },
+    {
+      "topic": "DBMS",
+      "subtopics": ["Normalization", "Transactions & ACID", "Indexing", "SQL Query Optimization", "Joins"]
+    },
+    {
+      "topic": "CN",
+      "subtopics": ["OSI Model", "TCP/IP", "HTTP/HTTPS", "DNS", "Load Balancing"]
+    },
+    {
+      "topic": "OOP",
+      "subtopics": ["Classes & Objects", "Inheritance", "Polymorphism", "Abstraction", "SOLID Principles"]
+    }
+  ]
+}

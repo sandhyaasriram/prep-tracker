@@ -1,0 +1,57 @@
+{
+  "name": "Sandhyaa Sriram",
+  "college": "VIT Chennai",
+  "degree": "B.Tech CSE (AI/ML)",
+  "gpa": 8.38,
+  "graduation_year": 2026,
+  "placement_season": {
+    "start": "2026-07-07",
+    "end": "2026-12-31"
+  },
+  "current_phase": "Pre-College",
+  "phase_schedule": [
+    {
+      "name": "Pre-College",
+      "start": "2026-06-29",
+      "end": "2026-07-06"
+    },
+    {
+      "name": "Early Semester",
+      "start": "2026-07-07",
+      "end": "2026-09-14"
+    },
+    {
+      "name": "Peak Season",
+      "start": "2026-09-15",
+      "end": "2026-11-15"
+    },
+    {
+      "name": "Late Season",
+      "start": "2026-11-16",
+      "end": "2026-12-31"
+    }
+  ],
+  "target_companies": [
+    "Amazon",
+    "Microsoft",
+    "Google",
+    "Adobe",
+    "Atlassian",
+    "Databricks",
+    "Walmart Global Tech",
+    "PhonePe",
+    "Moveworks",
+    "Okta",
+    "Goldman Sachs",
+    "JP Morgan Chase",
+    "BlackRock",
+    "Wells Fargo",
+    "BNY Mellon",
+    "American Express",
+    "Sabre",
+    "HSBC",
+    "Dell Technologies",
+    "Micron"
+  ],
+  "github": "sandhyaasriram"
+}

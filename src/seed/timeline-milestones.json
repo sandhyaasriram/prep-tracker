@@ -1,0 +1,13 @@
+{
+  "milestones": [
+    { "date": "2026-06-30", "label": "Placement OS launched", "category": "Personal", "color": "Warm Grey" },
+    { "date": "2026-07-06", "label": "Pre-college period ends", "category": "Personal", "color": "Warm Grey" },
+    { "date": "2026-07-07", "label": "7th semester begins", "category": "Personal", "color": "Warm Grey" },
+    { "date": "2026-08-11", "label": "Target AWS SAA exam date", "category": "Cert", "color": "Amber" },
+    { "date": "2026-09-15", "label": "Peak placement season begins", "category": "Application", "color": "Terracotta" },
+    { "date": "2026-10-01", "label": "Target: 200 DSA problems solved", "category": "DSA", "color": "Indigo" },
+    { "date": "2026-10-15", "label": "Microsoft / Amazon OA window", "category": "Application", "color": "Terracotta" },
+    { "date": "2026-11-15", "label": "Peak season ends", "category": "Personal", "color": "Warm Grey" },
+    { "date": "2026-12-31", "label": "Placement season close", "category": "Personal", "color": "Warm Grey" }
+  ]
+}

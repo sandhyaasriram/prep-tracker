@@ -1,0 +1,90 @@
+{
+  "projects": [
+    {
+      "name": "Privacy-Preserving Anomaly Detection (ICS)",
+      "tech_stack": ["Python", "PyTorch", "TenSEAL"],
+      "status": "In Progress",
+      "github_url": "",
+      "demo_url": "",
+      "type": "existing",
+      "placement_relevance": "Targets Amazon data and ML roles.",
+      "notes": ""
+    },
+    {
+      "name": "Manifold Learning DNN for Emotion Detection from EEG",
+      "tech_stack": ["Python", "PyTorch", "MNE"],
+      "status": "In Progress",
+      "github_url": "",
+      "demo_url": "",
+      "type": "existing",
+      "placement_relevance": "Targets ML-focused internship conversations.",
+      "notes": ""
+    },
+    {
+      "name": "VERA – Voice Enabled Real-Time Assistant",
+      "tech_stack": ["React", "Python", "Gemini API"],
+      "status": "In Progress",
+      "github_url": "",
+      "demo_url": "",
+      "type": "existing",
+      "placement_relevance": "Good for full-stack and AI product storytelling.",
+      "notes": ""
+    },
+    {
+      "name": "Face Recognition Attendance System",
+      "tech_stack": ["Python", "OpenCV", "FaceNet"],
+      "status": "In Progress",
+      "github_url": "",
+      "demo_url": "",
+      "type": "existing",
+      "placement_relevance": "Useful for computer vision depth and practical deployment evidence.",
+      "notes": ""
+    },
+    {
+      "name": "Real-Time Data Pipeline",
+      "tech_stack": ["Kafka", "Spark", "PostgreSQL", "Airflow"],
+      "status": "Planning",
+      "github_url": "",
+      "demo_url": "",
+      "type": "suggested",
+      "placement_relevance": "Targets data engineering roles.",
+      "notes": ""
+    },
+    {
+      "name": "ML Model API with Monitoring",
+      "tech_stack": ["FastAPI", "Docker", "Prometheus"],
+      "status": "Planning",
+      "github_url": "",
+      "demo_url": "",
+      "type": "suggested",
+      "placement_relevance": "Useful for platform and MLOps narratives.",
+      "notes": ""
+    },
+    {
+      "name": "SQL Analytics Dashboard",
+      "tech_stack": ["PostgreSQL", "Python", "Streamlit"],
+      "status": "Planning",
+      "github_url": "",
+      "demo_url": "",
+      "type": "suggested",
+      "placement_relevance": "Good for analytics and backend discussion.",
+      "notes": ""
+    },
+    {
+      "name": "Cloud-Deployed App",
+      "tech_stack": ["AWS EC2/Lambda", "S3", "RDS"],
+      "status": "Planning",
+      "github_url": "",
+      "demo_url": "",
+      "type": "suggested",
+      "placement_relevance": "Strong resume value for cloud-first roles.",
+      "notes": ""
+    }
+  ],
+  "checklists": {
+    "Privacy-Preserving Anomaly Detection (ICS)": ["README done", "Deployed", "Added to resume", "LinkedIn post", "Demo video"],
+    "Manifold Learning DNN for Emotion Detection from EEG": ["README done", "Deployed", "Added to resume", "LinkedIn post", "Demo video"],
+    "VERA – Voice Enabled Real-Time Assistant": ["README done", "Deployed", "Added to resume", "LinkedIn post", "Demo video"],
+    "Face Recognition Attendance System": ["README done", "Deployed", "Added to resume", "LinkedIn post", "Demo video"]
+  }
+}
