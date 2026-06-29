@@ -6,20 +6,24 @@
 import { LoginPage } from '@/pages/LoginPage';
 import { MissionControlPage } from '@/pages/MissionControlPage';
 import { DSAPage } from '@/pages/DSAPage';
+import { ApplicationsPage } from '@/pages/ApplicationsPage';
+import { InterviewPrepPage } from '@/pages/InterviewPrepPage';
 import { PlaceholderPage } from '@/pages/placeholderRoutes';
 import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavProgress } from '@/hooks/useNavProgress';
 import { useSeedUserData } from '@/hooks/useSeedUserData';
 import { useEffect, useState } from 'react';
 
-type HashRoute = '' | 'dsa' | 'applications' | 'weekly-review' | 'timeline' | 'settings';
+type HashRoute = '' | 'dsa' | 'applications' | 'interview-prep' | 'weekly-review' | 'timeline' | 'settings';
 
 export default function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth();
   const { seeding, error: seedError, retry: retrySeed, dismissError: dismissSeedError } = useSeedUserData(user?.id ?? null);
   const [route, setRoute] = useState<AppNavRoute>('Dashboard');
   const [seedErrorDismissed, setSeedErrorDismissed] = useState(false);
+  const { progress: navProgress, label: navProgressLabel } = useNavProgress(user?.id ?? null, route);
 
   useEffect(() => {
     const syncRoute = (): void => {
@@ -31,6 +35,11 @@ export default function App() {
 
       if (hash === 'applications') {
         setRoute('Applications');
+        return;
+      }
+
+      if (hash === 'interview-prep') {
+        setRoute('Interview Prep');
         return;
       }
 
@@ -115,7 +124,9 @@ export default function App() {
       case 'DSA':
         return <DSAPage user={user} />;
       case 'Applications':
-        return <PlaceholderPage title="Applications" description="This section will be built in Phase 7." user={user} />;
+        return <ApplicationsPage user={user} />;
+      case 'Interview Prep':
+        return <InterviewPrepPage user={user} />;
       case 'Weekly Review':
         return <PlaceholderPage title="Weekly Review" description="This section will be built in Phase 10." user={user} />;
       case 'Timeline':
@@ -131,7 +142,8 @@ export default function App() {
   return (
     <MainLayout
       user={user}
-      progressPercentage={route === 'DSA' ? 40 : 25}
+      progressPercentage={navProgress}
+      progressLabel={navProgressLabel}
       onSignOut={signOut}
       activeRoute={route}
       onNavigate={(nextRoute) => {
@@ -141,6 +153,10 @@ export default function App() {
         }
         if (nextRoute === 'Applications') {
           window.location.hash = 'applications';
+          return;
+        }
+        if (nextRoute === 'Interview Prep') {
+          window.location.hash = 'interview-prep';
           return;
         }
         if (nextRoute === 'Weekly Review') {

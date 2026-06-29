@@ -26,21 +26,24 @@ export const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
           collapsed ? 'w-16' : 'w-64'
         } ${className}`}
       >
-        <div className="flex items-center justify-between border-b border-[#E8E3DC] p-3 dark:border-[#232830]">
-          {!collapsed && (
-            <div className="min-w-0 px-1">
-              <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#7A736B] dark:text-[#6B7280]">Placement OS</p>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#7A736B] dark:text-[#6B7280] transition-colors duration-150 hover:bg-[#F3F0EB] hover:text-[#1A1614] dark:hover:bg-[#1C2028] dark:hover:text-[#E8EDF2]"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-          </button>
+        <div className="flex h-[var(--app-chrome-height)] shrink-0 flex-col border-b border-[#E8E3DC] dark:border-[#232830]">
+          <div className="flex h-[var(--app-topbar-row-height)] items-center justify-between px-3">
+            {!collapsed && (
+              <div className="min-w-0 px-1">
+                <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-[#7A736B] dark:text-[#6B7280]">Navigation</p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#7A736B] dark:text-[#6B7280] transition-colors duration-150 hover:bg-[#F3F0EB] hover:text-[#1A1614] dark:hover:bg-[#1C2028] dark:hover:text-[#E8EDF2] ${collapsed ? 'mx-auto' : 'ml-auto'}`}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+            </button>
+          </div>
+          <div className="h-[var(--app-progress-height)] shrink-0" aria-hidden="true" />
         </div>
 
         <nav className="flex-1 space-y-2 overflow-y-auto p-3">{children}</nav>

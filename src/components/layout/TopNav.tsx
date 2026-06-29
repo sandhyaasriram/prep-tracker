@@ -11,6 +11,7 @@ import { getResolvedTheme, subscribeToSystemTheme, toggleTheme, type ResolvedThe
 export interface TopNavProps {
   title?: string;
   progressPercentage?: number;
+  progressLabel?: string;
   children?: ReactNode;
 }
 
@@ -18,7 +19,7 @@ export interface TopNavProps {
  * Sticky top navigation with weekly progress bar and theme toggle.
  */
 export const TopNav = React.forwardRef<HTMLDivElement, TopNavProps>(
-  ({ title = 'Placement OS', progressPercentage = 0, children }, ref) => {
+  ({ title = 'Placement OS', progressPercentage = 0, progressLabel, children }, ref) => {
     const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
       typeof document !== 'undefined' ? getResolvedTheme() : 'light'
     );
@@ -38,9 +39,9 @@ export const TopNav = React.forwardRef<HTMLDivElement, TopNavProps>(
     return (
       <div
         ref={ref}
-        className="sticky top-0 z-30 border-b border-[#E8E3DC] bg-white dark:border-[#232830] dark:bg-[#13161A]"
+        className="sticky top-0 z-30 bg-white dark:bg-[#13161A]"
       >
-        <div className="flex items-center justify-between px-4 py-4 md:px-6">
+        <div className="flex h-[var(--app-topbar-row-height)] items-center justify-between px-4 md:px-6">
           <h1 className="font-display text-xl font-bold text-[#1A1614] dark:text-[#E8EDF2]">{title}</h1>
 
           <div className="flex items-center gap-3 md:gap-4">
@@ -58,17 +59,23 @@ export const TopNav = React.forwardRef<HTMLDivElement, TopNavProps>(
           </div>
         </div>
 
-        {clampedProgress > 0 && (
-          <div className="h-1 w-full bg-[#E8E3DC] dark:bg-[#232830]">
-            <div
-              className="h-full transition-all duration-500 motion-reduce:transition-none"
-              style={{
-                width: `${clampedProgress}%`,
-                background: 'linear-gradient(to right, #E8622A, #C4841A, #5B5FEF)',
-              }}
-            />
-          </div>
-        )}
+        <div
+          className="h-[var(--app-progress-height)] w-full bg-[#E8E3DC] dark:bg-[#232830]"
+          role="progressbar"
+          aria-valuenow={clampedProgress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={progressLabel ?? 'Progress'}
+          title={progressLabel}
+        >
+          <div
+            className="h-full transition-all duration-500 motion-reduce:transition-none"
+            style={{
+              width: `${clampedProgress}%`,
+              background: 'linear-gradient(to right, #E8622A, #C4841A, #5B5FEF)',
+            }}
+          />
+        </div>
       </div>
     );
   }

@@ -33,6 +33,27 @@ export const APPLICATION_SOURCES = {
   REFERRAL: 'Referral',
 } as const;
 
+export const APPLICATION_STAGE_ORDER = [
+  APPLICATION_STAGES.WISHLIST,
+  APPLICATION_STAGES.APPLIED,
+  APPLICATION_STAGES.ONLINE_ASSESSMENT,
+  APPLICATION_STAGES.INTERVIEW,
+  APPLICATION_STAGES.OFFER,
+  APPLICATION_STAGES.REJECTED,
+] as const;
+
+export const INTERVIEW_ROUND_TYPES = [
+  'Technical',
+  'DSA',
+  'Behavioural',
+  'HR',
+  'Managerial',
+  'System Design',
+  'Other',
+] as const;
+
+export const INTERVIEW_OUTCOMES = ['Scheduled', 'Passed', 'Failed', 'No show', 'Pending'] as const;
+
 export const PROJECT_STATUS = {
   PLANNING: 'Planning',
   IN_PROGRESS: 'In Progress',

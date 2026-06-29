@@ -4,17 +4,18 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic } from 'lucide-react';
 import { Sidebar, SidebarItem, TopNav } from '@/components';
 import { Button } from '@/components/ui';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/storage';
 import type { User } from '@supabase/supabase-js';
 
-export type AppNavRoute = 'Dashboard' | 'DSA' | 'Applications' | 'Weekly Review' | 'Timeline' | 'Settings';
+export type AppNavRoute = 'Dashboard' | 'DSA' | 'Applications' | 'Interview Prep' | 'Weekly Review' | 'Timeline' | 'Settings';
 
 interface MainLayoutProps {
   user: User;
   progressPercentage: number;
+  progressLabel?: string;
   onSignOut: () => void;
   children: ReactNode;
   activeRoute?: AppNavRoute;
@@ -25,6 +26,7 @@ const navigationItems: Array<{ label: AppNavRoute; icon: typeof LayoutDashboard 
   { label: 'Dashboard', icon: LayoutDashboard },
   { label: 'DSA', icon: Target },
   { label: 'Applications', icon: FolderKanban },
+  { label: 'Interview Prep', icon: Mic },
   { label: 'Weekly Review', icon: BookOpen },
   { label: 'Timeline', icon: CalendarDays },
   { label: 'Settings', icon: Settings },
@@ -36,6 +38,7 @@ const navigationItems: Array<{ label: AppNavRoute; icon: typeof LayoutDashboard 
 export function MainLayout({
   user,
   progressPercentage,
+  progressLabel,
   onSignOut,
   children,
   activeRoute = 'Dashboard',
@@ -87,7 +90,11 @@ export function MainLayout({
           sidebarCollapsed ? 'pl-16' : 'pl-64'
         }`}
       >
-        <TopNav title={activeRoute} progressPercentage={progressPercentage}>
+        <TopNav
+          title={activeRoute}
+          progressPercentage={progressPercentage}
+          {...(progressLabel !== undefined ? { progressLabel } : {})}
+        >
           <div className="hidden items-center gap-2 rounded-full border border-[#E8E3DC] px-3 py-1 text-sm font-normal text-[#7A736B] dark:text-[#6B7280] dark:border-[#232830] md:flex">
             <span className="h-2 w-2 rounded-full bg-[#2D7A4F]" />
             <span>{user.email}</span>

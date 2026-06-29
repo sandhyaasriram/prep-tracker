@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
 import { supabase } from '@/lib/supabase';
-import { calculateStreak, daysUntil, formatDisplayDate, getCurrentPhase, todayIST } from '@/utils';
+import { calculateStreak, daysUntil, formatDisplayDate, getCurrentPhase, todayIST, calculateWeeklyProgress } from '@/utils';
 import type { MissionControlData, MissionTask, RecentActivityItem, UpcomingDeadline } from '@/types/mission-control';
 import type { DSADifficulty, Phase } from '@/types';
 
@@ -417,7 +417,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
 
       const weeklyCompleted = weeklyGoals.filter((goal) => goal.start_date <= today && goal.end_date >= today && goal.completed).length;
       const weeklyTotal = weeklyGoals.filter((goal) => goal.start_date <= today && goal.end_date >= today).length || (currentGoal ? 1 : 0);
-      const weeklyProgressPercent = weeklyTotal > 0 ? Math.round((weeklyCompleted / weeklyTotal) * 100) : 0;
+      const weeklyProgressPercent = calculateWeeklyProgress(weeklyGoals, today);
 
       const solvedDates = dsaProblems.filter((problem) => problem.solved && problem.solved_date).map((problem) => problem.solved_date as string);
       const activeApplications = applications.filter((application) => application.stage !== 'Offer' && application.stage !== 'Rejected').length;

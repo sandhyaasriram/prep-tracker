@@ -60,6 +60,18 @@ export interface Application {
   updated_at: string;
 }
 
+export interface InterviewRound {
+  id: string;
+  application_id: string;
+  round_number: number;
+  type: string;
+  date: string | null;
+  outcome: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MockInterview {
   id: string;
   user_id: string;
@@ -70,6 +82,18 @@ export interface MockInterview {
   rating: number | null;
   went_well: string;
   improve: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CSFundamental {
+  id: string;
+  user_id: string;
+  topic: string;
+  subtopic: string;
+  status: CSFundamentalStatus;
+  last_revised: string | null;
+  notes: string;
   created_at: string;
   updated_at: string;
 }

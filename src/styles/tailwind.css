@@ -50,6 +50,12 @@
     opacity: 0;
   }
 
+  :root {
+    --app-topbar-row-height: 4.25rem;
+    --app-progress-height: 0.25rem;
+    --app-chrome-height: calc(var(--app-topbar-row-height) + var(--app-progress-height));
+  }
+
   /* Smooth scroll */
   @media (prefers-reduced-motion: no-preference) {
     html {
