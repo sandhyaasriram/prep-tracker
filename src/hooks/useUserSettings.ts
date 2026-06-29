@@ -65,17 +65,6 @@ export function useUserSettings(userId: string | null): UseUserSettingsResult {
     void fetchSettings();
   }, [fetchSettings]);
 
-  useEffect(() => {
-    if (settings?.theme) {
-      setLocalTheme(settings.theme);
-      if (settings.theme === 'light' || settings.theme === 'dark') {
-        applyTheme(settings.theme);
-      } else {
-        applyTheme(getResolvedTheme());
-      }
-    }
-  }, [settings?.theme]);
-
   const updateGeminiApiKey = useCallback(
     async (apiKey: string): Promise<void> => {
       if (!userId) {

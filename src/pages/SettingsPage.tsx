@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import profileSeed from '@/seed/profile.json';
 import { downloadUserBackup, importUserBackup, resetUserData, type PlacementOSBackup } from '@/utils/dataBackup';
+import { getTheme } from '@/utils/storage';
 import type { User } from '@supabase/supabase-js';
 
 interface SettingsPageProps {
@@ -48,7 +49,7 @@ export function SettingsPage({ user }: SettingsPageProps) {
     setCollege(settings.college);
     setGraduationYear(settings.graduation_year);
     setTargetCompaniesText(settings.target_companies.join(', '));
-    setTheme(settings.theme);
+    setTheme(getTheme());
   }, [settings]);
 
   const handleSaveProfile = async (): Promise<void> => {
