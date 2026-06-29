@@ -32,6 +32,10 @@ export function formatSupabaseError(error: unknown): string {
         return `${message}. Existing seed data was detected — refresh to resume syncing.`;
       }
 
+      if (shaped.code === '42501' || message.includes('row-level security')) {
+        return `${message}. Check that you are signed in and Supabase RLS policies from schema.sql exist for this table.`;
+      }
+
       return message;
     }
   }

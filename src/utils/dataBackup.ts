@@ -32,6 +32,53 @@ const USER_TABLES = [
   'user_settings',
 ] as const;
 
+/** Delete children before parents so RLS-backed cascades do not block wipes. */
+const DELETE_USER_TABLES_ORDER = [
+  'dsa_problems',
+  'weekly_goals',
+  'weekly_reviews',
+  'applications',
+  'mock_interviews',
+  'oa_log',
+  'cs_fundamentals',
+  'projects',
+  'certifications',
+  'journal_entries',
+  'timeline_milestones',
+  'user_settings',
+  'dsa_topics',
+] as const;
+
+const INSERT_BATCH_SIZE = 50;
+
+async function resolveAuthenticatedUserId(expectedUserId?: string): Promise<string> {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('Not signed in. Sign out, sign in again, then retry import.');
+  }
+
+  if (expectedUserId && expectedUserId !== user.id) {
+    throw new Error('Session mismatch. Refresh the page and retry import.');
+  }
+
+  return user.id;
+}
+
+async function insertRowsInBatches(table: string, rows: Array<Record<string, unknown>>): Promise<void> {
+  for (let index = 0; index < rows.length; index += INSERT_BATCH_SIZE) {
+    const batch = rows.slice(index, index + INSERT_BATCH_SIZE);
+    const { error } = await supabase.from(table).insert(batch);
+
+    if (error) {
+      throw error;
+    }
+  }
+}
+
 /**
  * Export all user-owned rows as a JSON backup object.
  */
@@ -139,10 +186,10 @@ export async function deleteAllUserData(userId: string): Promise<void> {
     }
   }
 
-  for (const table of USER_TABLES) {
+  for (const table of DELETE_USER_TABLES_ORDER) {
     const { error } = await supabase.from(table).delete().eq('user_id', userId);
     if (error) {
-      throw new Error(formatSupabaseError(error));
+      throw new Error(`Failed to clear ${table}: ${formatSupabaseError(error)}`);
     }
   }
 }
@@ -155,7 +202,9 @@ export async function importUserBackup(userId: string, backup: PlacementOSBackup
     throw new Error('Invalid backup file: missing tables.');
   }
 
-  await deleteAllUserData(userId);
+  const activeUserId = await resolveAuthenticatedUserId(userId);
+
+  await deleteAllUserData(activeUserId);
 
   const insertOrder: string[] = [
     'dsa_topics',
@@ -186,12 +235,20 @@ export async function importUserBackup(userId: string, backup: PlacementOSBackup
         ? rows
         : rows.map((row) => ({
             ...row,
-            user_id: userId,
+            user_id: activeUserId,
           }));
 
-    const { error } = await supabase.from(table).insert(normalized);
-    if (error) {
-      throw new Error(`Import failed on ${table}: ${formatSupabaseError(error)}`);
+    try {
+      await insertRowsInBatches(table, normalized);
+    } catch (error) {
+      const message = formatSupabaseError(error);
+      if (message.includes('row-level security')) {
+        throw new Error(
+          `Import failed on ${table}: ${message}. Confirm you are signed in and that supabase/schema.sql RLS policies are applied in your Supabase project.`
+        );
+      }
+
+      throw new Error(`Import failed on ${table}: ${message}`);
     }
   }
 }
