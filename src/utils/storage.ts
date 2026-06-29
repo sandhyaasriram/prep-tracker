@@ -39,7 +39,7 @@ export function setLastOpenedPage(page: string): void {
   localStorage.setItem(STORAGE_KEYS.LAST_OPENED_PAGE, page);
 }
 
-export function getCachedBrief(): { brief: string; generatedDate: string } | null {
+export function getCachedBrief(): { brief: string; generatedDate: string; source?: 'gemini' | 'fallback' } | null {
   const stored = localStorage.getItem(STORAGE_KEYS.GEMINI_BRIEF_CACHE);
   if (!stored) return null;
 
@@ -50,11 +50,12 @@ export function getCachedBrief(): { brief: string; generatedDate: string } | nul
   }
 }
 
-export function setCachedBrief(brief: string): void {
+export function setCachedBrief(brief: string, source: 'gemini' | 'fallback' = 'fallback'): void {
   localStorage.setItem(
     STORAGE_KEYS.GEMINI_BRIEF_CACHE,
     JSON.stringify({
       brief,
+      source,
       generatedDate: new Date().toISOString(),
     })
   );
