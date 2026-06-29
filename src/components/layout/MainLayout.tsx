@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic, Layers, Award, PenLine, Sparkles, Search } from 'lucide-react';
 import { Sidebar, SidebarItem, TopNav } from '@/components';
 import { Button } from '@/components/ui';
@@ -16,7 +17,8 @@ import { GlobalSearchModal } from '@/features/search/GlobalSearchModal';
 import { useGeminiCoach } from '@/hooks/useGeminiCoach';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/storage';
-import { clearOAuthReturnParams, wasOAuthReturnSuccess } from '@/lib/googleExport';
+import { clearOAuthReturnParams, readOAuthReturnError, wasOAuthReturnSuccess } from '@/lib/googleExport';
+import { toast } from '@/utils/toast';
 import type { User } from '@supabase/supabase-js';
 
 export type AppNavRoute =
@@ -71,6 +73,7 @@ export function MainLayout({
   activeRoute = 'Dashboard',
   onNavigate,
 }: MainLayoutProps) {
+  const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -107,24 +110,25 @@ export function MainLayout({
   }, [mobileNavOpen]);
 
   useEffect(() => {
+    const storedError = sessionStorage.getItem('placementos_oauth_toast_error');
+    if (storedError) {
+      toast.error(storedError);
+      sessionStorage.removeItem('placementos_oauth_toast_error');
+    }
+
+    const oauthError = readOAuthReturnError();
+    if (oauthError) {
+      toast.error(oauthError);
+      clearOAuthReturnParams();
+      return;
+    }
+
     if (!wasOAuthReturnSuccess()) {
       return;
     }
 
-    const raw = sessionStorage.getItem('placementos_pending_sheets_export');
-    if (raw) {
-      try {
-        const pending = JSON.parse(raw) as { returnHash?: string };
-        if (pending.returnHash) {
-          window.location.hash = pending.returnHash.replace(/^#/, '');
-        }
-      } catch {
-        // Ignore malformed pending export payloads.
-      }
-    }
-
     clearOAuthReturnParams();
-  }, []);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => {

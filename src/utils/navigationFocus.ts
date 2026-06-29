@@ -2,6 +2,8 @@
  * Session storage helpers for cross-page navigation focus.
  */
 
+import { hashToPath } from '@/utils/appRoutes';
+
 const JOURNAL_DATE_KEY = 'placementos_journal_date';
 const DSA_SEARCH_KEY = 'placementos_dsa_search';
 
@@ -42,8 +44,8 @@ export function consumeDsaNavigationSearch(): string | null {
 }
 
 /**
- * Navigate to a hash route.
+ * Navigate to an app route (legacy hash segments still supported).
  */
 export function navigateToHash(hash: string): void {
-  window.location.hash = hash.replace(/^#/, '');
+  window.location.assign(hashToPath(hash.replace(/^#/, '')));
 }

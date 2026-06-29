@@ -4,7 +4,6 @@
  */
 
 import { LoginPage } from '@/pages/LoginPage';
-import { GoogleOAuthCallbackPage } from '@/pages/GoogleOAuthCallbackPage';
 import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
 import { PageFallback } from '@/components/layout/PageFallback';
 import { Button } from '@/components/ui';
@@ -12,7 +11,18 @@ import { WeeklyGoalsProvider } from '@/context/WeeklyGoalsContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useSeedUserData } from '@/hooks/useSeedUserData';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
+import { APP_ROUTE_PATHS, hashToPath, pathToAppRoute } from '@/utils/appRoutes';
+import { readOAuthReturnError, clearOAuthReturnParams } from '@/lib/googleExport';
+import { toast } from '@/utils/toast';
+
+interface AuthenticatedAppProps {
+  user: User;
+  route: AppNavRoute;
+  onSignOut: () => void;
+  children: ReactNode;
+}
 
 const MissionControlPage = lazy(() =>
   import('@/pages/MissionControlPage').then((module) => ({ default: module.MissionControlPage }))
@@ -53,57 +63,16 @@ type HashRoute =
   | 'timeline'
   | 'settings';
 
-interface AuthenticatedAppProps {
-  user: User;
-  route: AppNavRoute;
-  onSignOut: () => void;
-  children: ReactNode;
-}
-
 function AuthenticatedApp({ user, route, onSignOut, children }: AuthenticatedAppProps) {
+  const navigate = useNavigate();
+
   return (
     <MainLayout
       user={user}
       onSignOut={onSignOut}
       activeRoute={route}
       onNavigate={(nextRoute) => {
-        if (nextRoute === 'DSA') {
-          window.location.hash = 'dsa';
-          return;
-        }
-        if (nextRoute === 'Applications') {
-          window.location.hash = 'applications';
-          return;
-        }
-        if (nextRoute === 'Interview Prep') {
-          window.location.hash = 'interview-prep';
-          return;
-        }
-        if (nextRoute === 'Projects') {
-          window.location.hash = 'projects';
-          return;
-        }
-        if (nextRoute === 'Certifications') {
-          window.location.hash = 'certifications';
-          return;
-        }
-        if (nextRoute === 'Journal') {
-          window.location.hash = 'journal';
-          return;
-        }
-        if (nextRoute === 'Weekly Review') {
-          window.location.hash = 'weekly-review';
-          return;
-        }
-        if (nextRoute === 'Timeline') {
-          window.location.hash = 'timeline';
-          return;
-        }
-        if (nextRoute === 'Settings') {
-          window.location.hash = 'settings';
-          return;
-        }
-        window.location.hash = '';
+        navigate(APP_ROUTE_PATHS[nextRoute]);
       }}
     >
       {children}
@@ -112,73 +81,51 @@ function AuthenticatedApp({ user, route, onSignOut, children }: AuthenticatedApp
 }
 
 export default function App() {
-  const isGoogleCallback =
-    window.location.pathname === '/auth/google/callback' ||
-    window.location.pathname === '//auth/google/callback';
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user, loading, signIn, signUp, signOut } = useAuth();
   const { seeding, error: seedError, retry: retrySeed, dismissError: dismissSeedError } = useSeedUserData(user?.id ?? null);
   const [route, setRoute] = useState<AppNavRoute>('Dashboard');
   const [seedErrorDismissed, setSeedErrorDismissed] = useState(false);
 
   useEffect(() => {
-    const syncRoute = (): void => {
-      const hash = window.location.hash.replace('#', '') as HashRoute;
-      if (hash === 'dsa') {
-        setRoute('DSA');
-        return;
-      }
+    if (location.pathname === '/' && location.hash) {
+      navigate(hashToPath(location.hash), { replace: true });
+      return;
+    }
 
-      if (hash === 'applications') {
-        setRoute('Applications');
-        return;
-      }
+    const routeFromPath = pathToAppRoute(location.pathname);
+    if (routeFromPath) {
+      setRoute(routeFromPath);
+      return;
+    }
 
-      if (hash === 'interview-prep') {
-        setRoute('Interview Prep');
-        return;
-      }
+    const hash = location.hash.replace('#', '') as HashRoute;
+    if (hash) {
+      navigate(hashToPath(hash), { replace: true });
+    }
+  }, [location.hash, location.pathname, navigate]);
 
-      if (hash === 'projects') {
-        setRoute('Projects');
-        return;
-      }
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
 
-      if (hash === 'certifications') {
-        setRoute('Certifications');
-        return;
-      }
+    const storedError = sessionStorage.getItem('placementos_oauth_toast_error');
+    if (storedError) {
+      toast.error(storedError);
+      sessionStorage.removeItem('placementos_oauth_toast_error');
+      navigate('/settings', { replace: true });
+      return;
+    }
 
-      if (hash === 'journal') {
-        setRoute('Journal');
-        return;
-      }
-
-      if (hash === 'weekly-review') {
-        setRoute('Weekly Review');
-        return;
-      }
-
-      if (hash === 'timeline') {
-        setRoute('Timeline');
-        return;
-      }
-
-      if (hash === 'settings') {
-        setRoute('Settings');
-        return;
-      }
-
-      setRoute('Dashboard');
-    };
-
-    syncRoute();
-    window.addEventListener('hashchange', syncRoute);
-    return () => window.removeEventListener('hashchange', syncRoute);
-  }, []);
-
-  if (isGoogleCallback) {
-    return <GoogleOAuthCallbackPage />;
-  }
+    const oauthError = readOAuthReturnError();
+    if (oauthError) {
+      toast.error(oauthError);
+      clearOAuthReturnParams();
+      navigate('/settings', { replace: true });
+    }
+  }, [navigate, user]);
 
   if (loading || seeding) {
     return (

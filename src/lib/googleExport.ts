@@ -4,9 +4,11 @@
  */
 
 import { supabase } from '@/lib/supabase';
+import { getCurrentAppPath } from '@/utils/appRoutes';
 
 const PENDING_EXPORT_KEY = 'placementos_pending_sheets_export';
 const OAUTH_JUST_COMPLETED_KEY = 'placementos_oauth_just_completed';
+const OAUTH_RETURN_PATH_KEY = 'placementos_oauth_return_path';
 
 export interface GoogleOAuthStatus {
   connected: boolean;
@@ -17,7 +19,7 @@ export interface PendingSheetsExport {
   sectionName: string;
   csvSection: string;
   rows: Record<string, unknown>[];
-  returnHash: string;
+  returnPath: string;
 }
 
 interface EdgeErrorResponse {
@@ -92,6 +94,8 @@ export async function fetchGoogleOAuthStatus(): Promise<GoogleOAuthStatus> {
  * Start Google OAuth — redirects the browser to Google's consent screen.
  */
 export async function startGoogleOAuth(): Promise<void> {
+  storeOAuthReturnPath();
+
   const accessToken = await getAccessToken();
   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-oauth`, {
     method: 'POST',
@@ -129,12 +133,35 @@ export async function completeGoogleOAuth(code: string, state: string): Promise<
 }
 
 /**
- * Redirect back to the app after OAuth callback handling.
+ * Remember where to send the user after OAuth completes.
+ */
+export function storeOAuthReturnPath(): void {
+  sessionStorage.setItem(OAUTH_RETURN_PATH_KEY, getCurrentAppPath());
+}
+
+/**
+ * Resolve post-OAuth destination — pending export path, stored path, or dashboard.
+ */
+export function resolveOAuthReturnPath(): string {
+  const pending = peekPendingSheetsExport();
+  if (pending?.returnPath) {
+    return pending.returnPath;
+  }
+
+  const stored = sessionStorage.getItem(OAUTH_RETURN_PATH_KEY);
+  if (stored) {
+    return stored;
+  }
+
+  return '/dashboard';
+}
+
+/**
+ * @deprecated Use React Router navigation from GoogleOAuthCallbackPage instead.
  */
 export function redirectAfterGoogleOAuth(success: boolean, errorMessage?: string): void {
-  const pending = peekPendingSheetsExport();
-  const returnHash = pending?.returnHash ?? '';
-  const url = new URL(window.location.origin);
+  const returnPath = resolveOAuthReturnPath();
+  const url = new URL(returnPath, window.location.origin);
 
   url.searchParams.set('google_oauth', success ? 'success' : 'error');
   if (!success && errorMessage) {
@@ -145,14 +172,20 @@ export function redirectAfterGoogleOAuth(success: boolean, errorMessage?: string
     sessionStorage.setItem(OAUTH_JUST_COMPLETED_KEY, '1');
   }
 
-  window.location.replace(`${url.toString()}${returnHash}`);
+  window.location.replace(`${url.pathname}${url.search}`);
 }
 
 export function consumeOAuthJustCompleted(): boolean {
-  const value = sessionStorage.getItem(OAUTH_JUST_COMPLETED_KEY) === '1';
+  const value =
+    sessionStorage.getItem(OAUTH_JUST_COMPLETED_KEY) === '1' ||
+    sessionStorage.getItem('placementos_oauth_just_completed') === '1';
+
   if (value) {
     sessionStorage.removeItem(OAUTH_JUST_COMPLETED_KEY);
+    sessionStorage.removeItem('placementos_oauth_just_completed');
+    sessionStorage.removeItem(OAUTH_RETURN_PATH_KEY);
   }
+
   return value;
 }
 
@@ -197,10 +230,10 @@ export async function exportSectionToGoogleSheets(
   return { url: data.url, title: data.title ?? sectionName };
 }
 
-export function storePendingSheetsExport(exportData: Omit<PendingSheetsExport, 'returnHash'>): void {
+export function storePendingSheetsExport(exportData: Omit<PendingSheetsExport, 'returnPath'>): void {
   const payload: PendingSheetsExport = {
     ...exportData,
-    returnHash: window.location.hash,
+    returnPath: getCurrentAppPath(),
   };
   sessionStorage.setItem(PENDING_EXPORT_KEY, JSON.stringify(payload));
 }

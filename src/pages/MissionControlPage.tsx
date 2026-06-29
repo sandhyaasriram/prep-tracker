@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
   Clock3,
@@ -17,6 +18,7 @@ import { Badge, Card, CardBody, CardHeader } from '@/components';
 import profileSeed from '@/seed/profile.json';
 import { PeakSeasonStat } from '@/features/mission-control/PeakSeasonStat';
 import { useMissionControlData } from '@/hooks/useMissionControlData';
+import { APP_ROUTE_PATHS } from '@/utils/appRoutes';
 import { formatDisplayDate, formatTimestampIST, getCurrentPhase, todayIST } from '@/utils';
 import type { User } from '@supabase/supabase-js';
 
@@ -28,6 +30,7 @@ interface MissionControlPageProps {
  * Primary landing page after authentication.
  */
 export function MissionControlPage({ user }: MissionControlPageProps) {
+  const navigate = useNavigate();
   const { data, loading, error, toggleMissionTask, refresh } = useMissionControlData(user.id);
   const [isRefreshingDeadlines, setIsRefreshingDeadlines] = useState(false);
   const [phaseMenuOpen, setPhaseMenuOpen] = useState(false);
@@ -50,7 +53,7 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
 
   const handleOpenTimeline = (): void => {
     setPhaseMenuOpen(false);
-    window.location.hash = 'timeline';
+    navigate(APP_ROUTE_PATHS.Timeline);
   };
 
   useEffect(() => {
