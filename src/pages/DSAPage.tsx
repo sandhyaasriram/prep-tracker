@@ -3,12 +3,11 @@
  * Shows topic progress, problem lists, revision mode, and CSV export.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
   Clock3,
-  Download,
   Flame,
   Plus,
   RotateCcw,
@@ -17,13 +16,14 @@ import {
   Timer,
 } from 'lucide-react';
 import { Badge, Button, Card, CardBody, CardHeader, Input } from '@/components';
+import { ExportMenu } from '@/features/export/ExportMenu';
 import { AddProblemModal } from '@/features/dsa/AddProblemModal';
 import { ProblemDetailPopover } from '@/features/dsa/ProblemDetailPopover';
 import type { ProblemSelectHandler } from '@/features/dsa/ProblemListItem';
 import { RevisionSessionModal } from '@/features/dsa/RevisionSessionModal';
 import { TopicProblemList } from '@/features/dsa/TopicProblemList';
 import { useDSAData } from '@/hooks/useDSAData';
-import { exportToCSV, generateCSVFilename } from '@/utils';
+import { consumeDsaNavigationSearch } from '@/utils/navigationFocus';
 import type { User } from '@supabase/supabase-js';
 import type { DSAProblemSummary, DSATopicSummary } from '@/types/dsa';
 
@@ -87,6 +87,13 @@ export function DSAPage({ user }: DSAPageProps) {
   const [revisionMode, setRevisionMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openPopover, setOpenPopover] = useState<OpenProblemPopover | null>(null);
+
+  useEffect(() => {
+    const pendingSearch = consumeDsaNavigationSearch();
+    if (pendingSearch) {
+      setSearchQuery(pendingSearch);
+    }
+  }, []);
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [addProblemTopic, setAddProblemTopic] = useState<{ id: string; name: string } | null>(null);
   const [revisionSessionOpen, setRevisionSessionOpen] = useState(false);
@@ -155,15 +162,17 @@ export function DSAPage({ user }: DSAPageProps) {
     );
   };
 
+  const exportRows = useMemo((): Record<string, unknown>[] => {
+    if (!data) {
+      return [];
+    }
+
+    return flattenDSAExport(data.topics, data.problemsByTopic);
+  }, [data]);
+
   const showMessage = (message: string): void => {
     setLocalMessage(message);
     window.setTimeout(() => setLocalMessage(null), 2500);
-  };
-
-  const handleExport = (): void => {
-    if (!data) return;
-    exportToCSV(flattenDSAExport(data.topics, data.problemsByTopic), generateCSVFilename('dsa'));
-    showMessage('CSV exported with IST date.');
   };
 
   const handleStartRevisionSession = (): void => {
@@ -217,9 +226,13 @@ export function DSAPage({ user }: DSAPageProps) {
               <Button variant="secondary" size="sm" icon={<Timer size={14} />} onClick={handleStartRevisionSession}>
                 Start revision session
               </Button>
-              <Button variant="secondary" size="sm" icon={<Download size={14} />} onClick={handleExport}>
-                Export CSV
-              </Button>
+              <ExportMenu
+                csvSection="dsa"
+                sheetSectionName="DSA"
+                rows={exportRows}
+                userEmail={user.email ?? 'your account'}
+                onMessage={showMessage}
+              />
             </div>
           </div>
 

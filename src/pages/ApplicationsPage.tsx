@@ -3,14 +3,14 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { Download, LayoutGrid, Plus, Table2 } from 'lucide-react';
+import { LayoutGrid, Plus, Table2 } from 'lucide-react';
 import { Badge, Button, Card, CardBody, Input } from '@/components';
+import { ExportMenu } from '@/features/export/ExportMenu';
 import { AddApplicationModal } from '@/features/applications/AddApplicationModal';
 import { ApplicationDetailModal } from '@/features/applications/ApplicationDetailModal';
 import { ApplicationKanban } from '@/features/applications/ApplicationKanban';
 import { ApplicationTable } from '@/features/applications/ApplicationTable';
 import { useApplicationsData } from '@/hooks/useApplicationsData';
-import { exportToCSV, generateCSVFilename } from '@/utils';
 import { APPLICATION_SOURCES, APPLICATION_STAGE_ORDER } from '@/constants';
 import type { User } from '@supabase/supabase-js';
 import type { ApplicationFilters } from '@/types/applications';
@@ -59,7 +59,7 @@ export function ApplicationsPage({ user }: ApplicationsPageProps) {
     [filters, setFilters]
   );
 
-  const exportRows = useMemo(() => {
+  const exportRows = useMemo((): Record<string, unknown>[] => {
     if (!data) {
       return [];
     }
@@ -76,10 +76,6 @@ export function ApplicationsPage({ user }: ApplicationsPageProps) {
       notes: app.notes,
     }));
   }, [data]);
-
-  const handleExport = (): void => {
-    exportToCSV(exportRows, generateCSVFilename('applications'));
-  };
 
   if (loading) {
     return <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">Loading applications...</p>;
@@ -123,9 +119,12 @@ export function ApplicationsPage({ user }: ApplicationsPageProps) {
           >
             Table
           </Button>
-          <Button variant="secondary" size="sm" icon={<Download size={14} />} onClick={handleExport}>
-            Export CSV
-          </Button>
+          <ExportMenu
+            csvSection="applications"
+            sheetSectionName="Applications"
+            rows={exportRows}
+            userEmail={user.email ?? 'your account'}
+          />
           <Button size="sm" icon={<Plus size={14} />} onClick={() => setAddModalOpen(true)}>
             Add application
           </Button>

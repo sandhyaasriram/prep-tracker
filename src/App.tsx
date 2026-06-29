@@ -14,6 +14,7 @@ import { JournalPage } from '@/pages/JournalPage';
 import { WeeklyReviewPage } from '@/pages/WeeklyReviewPage';
 import { TimelinePage } from '@/pages/TimelinePage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { GoogleOAuthCallbackPage } from '@/pages/GoogleOAuthCallbackPage';
 import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +35,9 @@ type HashRoute =
   | 'settings';
 
 export default function App() {
+  const isGoogleCallback =
+    window.location.pathname === '/auth/google/callback' ||
+    window.location.pathname === '//auth/google/callback';
   const { user, loading, signIn, signUp, signOut } = useAuth();
   const { seeding, error: seedError, retry: retrySeed, dismissError: dismissSeedError } = useSeedUserData(user?.id ?? null);
   const [route, setRoute] = useState<AppNavRoute>('Dashboard');
@@ -95,6 +99,10 @@ export default function App() {
     window.addEventListener('hashchange', syncRoute);
     return () => window.removeEventListener('hashchange', syncRoute);
   }, []);
+
+  if (isGoogleCallback) {
+    return <GoogleOAuthCallbackPage />;
+  }
 
   if (loading || seeding) {
     return (

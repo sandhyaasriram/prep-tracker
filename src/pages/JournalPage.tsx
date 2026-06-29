@@ -8,6 +8,7 @@ import { Button, Input } from '@/components';
 import { JournalDateSidebar } from '@/features/journal/JournalDateSidebar';
 import { exportJournalMarkdown, useJournalData } from '@/hooks/useJournalData';
 import { formatDisplayDate, todayIST } from '@/utils';
+import { consumeJournalNavigationDate } from '@/utils/navigationFocus';
 import type { User } from '@supabase/supabase-js';
 
 interface JournalPageProps {
@@ -28,6 +29,13 @@ export function JournalPage({ user }: JournalPageProps) {
   const selectedEntry = useMemo(() => {
     return data?.entries.find((entry) => entry.date === selectedDate) ?? null;
   }, [data, selectedDate]);
+
+  useEffect(() => {
+    const pendingDate = consumeJournalNavigationDate();
+    if (pendingDate) {
+      setSelectedDate(pendingDate);
+    }
+  }, []);
 
   useEffect(() => {
     setDraft(selectedEntry?.content_markdown ?? '');

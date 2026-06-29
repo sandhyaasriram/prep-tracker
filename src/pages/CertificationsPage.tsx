@@ -3,12 +3,12 @@
  */
 
 import { useState } from 'react';
-import { Download, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button, Card, CardBody } from '@/components';
+import { ExportMenu } from '@/features/export/ExportMenu';
 import { AddCertificationModal } from '@/features/certifications/AddCertificationModal';
 import { CertificationCard } from '@/features/certifications/CertificationCard';
 import { useCertificationsData } from '@/hooks/useCertificationsData';
-import { exportToCSV, generateCSVFilename } from '@/utils';
 import type { User } from '@supabase/supabase-js';
 
 interface CertificationsPageProps {
@@ -22,23 +22,17 @@ export function CertificationsPage({ user }: CertificationsPageProps) {
   const { data, loading, error, addCertification, updateCertification, deleteCertification } = useCertificationsData(user.id);
   const [addModalOpen, setAddModalOpen] = useState(false);
 
-  const handleExport = (): void => {
-    if (!data) {
-      return;
-    }
-
-    const rows = [...data.inProgress, ...data.completed].map((cert) => ({
-      name: cert.name,
-      provider: cert.provider,
-      status: cert.status,
-      target_date: cert.target_date,
-      progress: cert.progress,
-      cert_url: cert.cert_url,
-      notes: cert.notes,
-    }));
-
-    exportToCSV(rows, generateCSVFilename('certifications'));
-  };
+  const exportRows = !data
+    ? []
+    : [...data.inProgress, ...data.completed].map((cert) => ({
+        name: cert.name,
+        provider: cert.provider,
+        status: cert.status,
+        target_date: cert.target_date,
+        progress: cert.progress,
+        cert_url: cert.cert_url,
+        notes: cert.notes,
+      }));
 
   if (loading) {
     return <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">Loading certifications...</p>;
@@ -66,9 +60,12 @@ export function CertificationsPage({ user }: CertificationsPageProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm" icon={<Download size={14} />} onClick={handleExport}>
-            Export CSV
-          </Button>
+          <ExportMenu
+            csvSection="certifications"
+            sheetSectionName="Certifications"
+            rows={exportRows}
+            userEmail={user.email ?? 'your account'}
+          />
           <Button size="sm" icon={<Plus size={14} />} onClick={() => setAddModalOpen(true)}>
             Add certification
           </Button>

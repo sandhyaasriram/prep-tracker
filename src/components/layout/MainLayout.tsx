@@ -4,14 +4,17 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic, Layers, Award, PenLine, Sparkles } from 'lucide-react';
+import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic, Layers, Award, PenLine, Sparkles, Search } from 'lucide-react';
 import { Sidebar, SidebarItem, TopNav } from '@/components';
 import { Button } from '@/components/ui';
 import { CoachPanel } from '@/features/coach/CoachPanel';
+import { KeyboardShortcutsModal } from '@/features/help/KeyboardShortcutsModal';
+import { GlobalSearchModal } from '@/features/search/GlobalSearchModal';
 import { useGeminiCoach } from '@/hooks/useGeminiCoach';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { clearBriefCache } from '@/utils/coachCache';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/storage';
+import { clearOAuthReturnParams, wasOAuthReturnSuccess } from '@/lib/googleExport';
 import type { User } from '@supabase/supabase-js';
 
 export type AppNavRoute =
@@ -49,6 +52,15 @@ const navigationItems: Array<{ label: AppNavRoute; icon: typeof LayoutDashboard 
   { label: 'Settings', icon: Settings },
 ];
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
+}
+
 /**
  * Authenticated application shell.
  */
@@ -63,6 +75,8 @@ export function MainLayout({
 }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { hasGeminiKey, updateGeminiApiKey, loading: settingsLoading } = useUserSettings(user.id);
   const coach = useGeminiCoach(user.id, hasGeminiKey, !settingsLoading);
 
@@ -80,10 +94,45 @@ export function MainLayout({
   }, []);
 
   useEffect(() => {
+    if (!wasOAuthReturnSuccess()) {
+      return;
+    }
+
+    const raw = sessionStorage.getItem('placementos_pending_sheets_export');
+    if (raw) {
+      try {
+        const pending = JSON.parse(raw) as { returnHash?: string };
+        if (pending.returnHash) {
+          window.location.hash = pending.returnHash.replace(/^#/, '');
+        }
+      } catch {
+        // Ignore malformed pending export payloads.
+      }
+    }
+
+    clearOAuthReturnParams();
+  }, []);
+
+  useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'c') {
+      const key = event.key.toLowerCase();
+      const mod = event.ctrlKey || event.metaKey;
+
+      if (mod && event.shiftKey && key === 'c') {
         event.preventDefault();
         setCoachOpen((open) => !open);
+        return;
+      }
+
+      if (mod && key === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+
+      if (event.key === '?' && !isTypingTarget(event.target)) {
+        event.preventDefault();
+        setShortcutsOpen(true);
       }
     };
 
@@ -137,6 +186,15 @@ export function MainLayout({
           {...(progressLabel !== undefined ? { progressLabel } : {})}
         >
           <Button
+            variant="ghost"
+            size="sm"
+            icon={<Search size={14} />}
+            onClick={() => setSearchOpen(true)}
+            title="Search (Ctrl/Cmd + K)"
+          >
+            Search
+          </Button>
+          <Button
             variant={coachOpen ? 'primary' : 'ghost'}
             size="sm"
             icon={<Sparkles size={14} />}
@@ -168,6 +226,10 @@ export function MainLayout({
         onRegenerate={coach.regenerateBrief}
         onSaveApiKey={handleSaveGeminiKey}
       />
+
+      <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} userId={user.id} />
+
+      <KeyboardShortcutsModal isOpen={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }

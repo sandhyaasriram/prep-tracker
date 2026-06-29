@@ -454,3 +454,21 @@ create policy "user_settings_select_own" on public.user_settings for select usin
 create policy "user_settings_insert_own" on public.user_settings for insert with check (auth.uid() = user_id);
 create policy "user_settings_update_own" on public.user_settings for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "user_settings_delete_own" on public.user_settings for delete using (auth.uid() = user_id);
+
+-- Google OAuth credentials (no authenticated policies — service role only)
+
+create table if not exists public.google_oauth_credentials (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  refresh_token text not null,
+  access_token text not null default '',
+  expires_at timestamptz,
+  google_email text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.google_oauth_credentials enable row level security;
+
+create trigger set_google_oauth_credentials_updated_at
+before update on public.google_oauth_credentials
+for each row execute function public.set_updated_at();

@@ -3,21 +3,24 @@
  * Shows the daily command center, weekly progress, deadlines, and recent activity.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Download,
   Flame,
   MoreVertical,
   RefreshCw,
   Sparkles,
   Target,
+  Upload,
 } from 'lucide-react';
-import { Badge, Card, CardBody, CardHeader } from '@/components';
+import { Badge, Button, Card, CardBody, CardHeader } from '@/components';
 import profileSeed from '@/seed/profile.json';
 import { useMissionControlData } from '@/hooks/useMissionControlData';
 import { formatDisplayDate, getCurrentPhase, todayIST } from '@/utils';
+import { downloadUserBackup, importUserBackup, type PlacementOSBackup } from '@/utils/dataBackup';
 import type { User } from '@supabase/supabase-js';
 
 interface MissionControlPageProps {
@@ -29,9 +32,10 @@ interface MissionControlPageProps {
  */
 export function MissionControlPage({ user }: MissionControlPageProps) {
   const { data, loading, error, toggleMissionTask, refresh } = useMissionControlData(user.id);
-  const [quickCaptureMessage, setQuickCaptureMessage] = useState<string | null>(null);
   const [isRefreshingDeadlines, setIsRefreshingDeadlines] = useState(false);
   const [phaseMenuOpen, setPhaseMenuOpen] = useState(false);
+  const [dataMessage, setDataMessage] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<'export' | 'import' | null>(null);
   const phaseMenuRef = useRef<HTMLDivElement>(null);
 
   const displayName = data?.firstName ?? profileSeed.name.split(' ')[0] ?? profileSeed.name;
@@ -39,11 +43,6 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
   const currentDateLabel = data?.currentDateLabel ?? formatDisplayDate(todayIST());
   const weeklyProgress = data?.weeklyProgressPercent ?? 0;
   const topMissionTasks = useMemo(() => data?.missionTasks ?? [], [data]);
-
-  const handleQuickCapture = (): void => {
-    setQuickCaptureMessage('Quick Capture is coming in Phase 11.');
-    window.setTimeout(() => setQuickCaptureMessage(null), 2500);
-  };
 
   const handleRefreshDeadlines = async (): Promise<void> => {
     setIsRefreshingDeadlines(true);
@@ -57,6 +56,44 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
   const handleOpenTimeline = (): void => {
     setPhaseMenuOpen(false);
     window.location.hash = 'timeline';
+  };
+
+  const handleExport = async (): Promise<void> => {
+    setBusyAction('export');
+    setDataMessage(null);
+
+    try {
+      await downloadUserBackup(user.id);
+      setDataMessage('Backup downloaded.');
+    } catch (exportError) {
+      setDataMessage(exportError instanceof Error ? exportError.message : 'Export failed.');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    setBusyAction('import');
+    setDataMessage(null);
+
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text) as PlacementOSBackup;
+      await importUserBackup(user.id, backup);
+      setDataMessage('Backup imported. Refresh the page if counts look stale.');
+      await refresh({ silent: true });
+    } catch (importError) {
+      setDataMessage(importError instanceof Error ? importError.message : 'Import failed.');
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   useEffect(() => {
@@ -376,21 +413,38 @@ export function MissionControlPage({ user }: MissionControlPageProps) {
         </CardBody>
       </Card>
 
-      <button
-        type="button"
-        onClick={handleQuickCapture}
-        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-[#5B5FEF] px-5 py-3 text-sm font-medium text-white shadow-lg transition-transform duration-150 hover:shadow-xl active:scale-95"
-        aria-label="Quick capture"
-      >
-        <Sparkles size={16} />
-        Quick Capture
-      </button>
-
-      {quickCaptureMessage && (
-        <div className="fixed bottom-24 right-6 z-40 rounded-xl bg-[#1A1614] px-4 py-3 text-sm text-white shadow-xl">
-          {quickCaptureMessage}
-        </div>
-      )}
+      <Card>
+        <CardHeader>
+          <div>
+            <p className="text-sm font-medium text-[#7A736B] dark:text-[#6B7280]">Data backup</p>
+            <p className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Export or restore your workspace</p>
+          </div>
+        </CardHeader>
+        <CardBody className="space-y-3">
+          <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">
+            Full JSON backup of all tables. Import replaces current data — export first if unsure.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Download size={14} />}
+              disabled={busyAction !== null}
+              onClick={() => void handleExport()}
+            >
+              {busyAction === 'export' ? 'Exporting...' : 'Export all as JSON'}
+            </Button>
+            <label className="inline-flex">
+              <input type="file" accept="application/json,.json" className="hidden" onChange={(event) => void handleImport(event)} />
+              <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#E8E3DC] bg-white px-3 py-2 text-sm text-[#1A1614] transition-colors hover:bg-[#F3F0EB] dark:border-[#232830] dark:bg-[#1C2028] dark:text-[#E8EDF2] dark:hover:bg-[#232830]">
+                <Upload size={14} />
+                {busyAction === 'import' ? 'Importing...' : 'Import from JSON'}
+              </span>
+            </label>
+          </div>
+          {dataMessage && <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">{dataMessage}</p>}
+        </CardBody>
+      </Card>
     </div>
   );
 }

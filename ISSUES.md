@@ -25,3 +25,10 @@ The daily brief works (Gemini + rules fallback), but the prompt needs iteration 
 - Align fallback brief structure with Gemini brief so both feel consistent
 
 **Acceptance:** Regenerated briefs feel specific to live data, not boilerplate; tasks are prioritized and time-estimated realistically.
+
+---
+
+## Dark Mode 
+
+Too dark - feels too cluttered
+dark mode supposed to make you feel relaxed, feels like overwhelming noise
