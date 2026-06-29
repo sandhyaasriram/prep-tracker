@@ -3,11 +3,13 @@
  * Reads dashboard data from Supabase and falls back to seeded defaults when needed.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
 import { supabase } from '@/lib/supabase';
-import { calculateStreak, daysUntil, formatDisplayDate, getCurrentPhase, todayIST, calculateWeeklyProgress } from '@/utils';
+import { useWeeklyGoals, type WeeklyGoalRow } from '@/context/WeeklyGoalsContext';
+import { calculateStreak, formatDisplayDate, getCurrentPhase, getTimeOfDayGreeting, todayIST, calculateWeeklyProgress, getPeakSeasonDashboardState } from '@/utils';
+import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
 import type { MissionControlData, MissionTask, RecentActivityItem, UpcomingDeadline } from '@/types/mission-control';
 import type { DSADifficulty, Phase } from '@/types';
 
@@ -29,16 +31,6 @@ interface DSATopicRow {
   name: string;
   order_index: number;
   target_problem_count: number;
-}
-
-interface WeeklyGoalRow {
-  id: string;
-  week_number: number;
-  start_date: string;
-  end_date: string;
-  category: string;
-  goal_text: string;
-  completed: boolean;
 }
 
 interface ApplicationRow {
@@ -92,7 +84,7 @@ function buildFallbackMissionControlData(): MissionControlData {
 
   return {
     firstName,
-    greeting: getGreeting(),
+    greeting: getTimeOfDayGreeting(),
     currentDateLabel,
     currentPhase,
     phaseSchedule: profileSeed.phase_schedule.map((phase) => ({
@@ -111,17 +103,10 @@ function buildFallbackMissionControlData(): MissionControlData {
     totalDsaSolved: 0,
     activeApplications: 0,
     mocksDone: 0,
-    daysUntilPeakSeason: Math.max(daysUntil('2026-09-15'), 0),
+    daysUntilPeakSeason: getPeakSeasonDashboardState().daysLeft,
     upcomingDeadlines: [],
     recentActivity: [],
   };
-}
-
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Morning';
-  if (hour < 18) return 'Afternoon';
-  return 'Evening';
 }
 
 function buildDefaultMissionTasks(): MissionTask[] {
@@ -352,10 +337,14 @@ export interface UseMissionControlDataResult {
 }
 
 export function useMissionControlData(userId: string | null): UseMissionControlDataResult {
+  const { goals: weeklyGoals, toggleWeeklyGoal, isWeeklyGoal } = useWeeklyGoals();
+  const weeklyGoalsRef = useRef(weeklyGoals);
+  weeklyGoalsRef.current = weeklyGoals;
   const [data, setData] = useState<MissionControlData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  const hydratedRef = useRef(false);
 
   const refresh = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
@@ -365,7 +354,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
       return;
     }
 
-    if (!options?.silent) {
+    if (!options?.silent && shouldShowInitialLoading(hydratedRef, options?.silent)) {
       setLoading(true);
     }
     setError(null);
@@ -373,14 +362,13 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
     try {
       const today = todayIST();
 
-      const [topicsResult, problemsResult, goalsResult, applicationsResult, certificationsResult, mocksResult, oaLogsResult] = await Promise.all([
+      const [topicsResult, problemsResult, applicationsResult, certificationsResult, mocksResult, oaLogsResult] = await Promise.all([
         supabase.from('dsa_topics').select('id, name, order_index, target_problem_count').eq('user_id', userId).order('order_index', { ascending: true }),
         supabase
           .from('dsa_problems')
           .select('id, name, difficulty, solved, solved_date, flagged_for_revision, updated_at, topic_id, leetcode_url, notes')
           .eq('user_id', userId)
           .order('updated_at', { ascending: false }),
-        supabase.from('weekly_goals').select('id, week_number, start_date, end_date, category, goal_text, completed').eq('user_id', userId).order('week_number', { ascending: true }),
         supabase.from('applications').select('id, company, role, stage, next_deadline, date_applied, updated_at, source').eq('user_id', userId).order('updated_at', { ascending: false }),
         supabase.from('certifications').select('id, name, provider, status, target_date, progress, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }),
         supabase.from('mock_interviews').select('id, date, type, platform, rating, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }),
@@ -389,7 +377,6 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
 
       if (topicsResult.error) throw topicsResult.error;
       if (problemsResult.error) throw problemsResult.error;
-      if (goalsResult.error) throw goalsResult.error;
       if (applicationsResult.error) throw applicationsResult.error;
       if (certificationsResult.error) throw certificationsResult.error;
       if (mocksResult.error) throw mocksResult.error;
@@ -397,7 +384,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
 
       const topics = (topicsResult.data ?? []) as DSATopicRow[];
       const dsaProblems = (problemsResult.data ?? []) as DSAProblemRow[];
-      const weeklyGoals = (goalsResult.data ?? []) as WeeklyGoalRow[];
+      const weeklyGoalsSnapshot = weeklyGoalsRef.current;
       const applications = (applicationsResult.data ?? []) as ApplicationRow[];
       const certifications = (certificationsResult.data ?? []) as CertificationRow[];
       const mocks = (mocksResult.data ?? []) as MockInterviewRow[];
@@ -406,7 +393,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
       const currentPhase = getCurrentPhase(profileSeed.phase_schedule) as Phase;
       const firstName = profileSeed.name.split(' ')[0] ?? profileSeed.name;
       const currentDateLabel = formatDisplayDate(today);
-      const currentGoal = chooseCurrentOrUpcomingGoal(weeklyGoals, today);
+      const currentGoal = chooseCurrentOrUpcomingGoal(weeklyGoalsSnapshot, today);
       const topDsaTopic = findTopTopic(topics, dsaProblems);
       const nextCertification = certifications.find((cert) => cert.status === 'In Progress') ?? certifications[0];
       const nextApplication = applications.find((application) => application.stage !== 'Offer' && application.stage !== 'Rejected');
@@ -418,9 +405,9 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
         application: nextApplication,
       });
 
-      const weeklyCompleted = weeklyGoals.filter((goal) => goal.start_date <= today && goal.end_date >= today && goal.completed).length;
-      const weeklyTotal = weeklyGoals.filter((goal) => goal.start_date <= today && goal.end_date >= today).length || (currentGoal ? 1 : 0);
-      const weeklyProgressPercent = calculateWeeklyProgress(weeklyGoals, today);
+      const weeklyCompleted = weeklyGoalsSnapshot.filter((goal) => goal.start_date <= today && goal.end_date >= today && goal.completed).length;
+      const weeklyTotal = weeklyGoalsSnapshot.filter((goal) => goal.start_date <= today && goal.end_date >= today).length || (currentGoal ? 1 : 0);
+      const weeklyProgressPercent = calculateWeeklyProgress(weeklyGoalsSnapshot, today);
 
       const solvedDates = dsaProblems.filter((problem) => problem.solved && problem.solved_date).map((problem) => problem.solved_date as string);
       const activeApplications = applications.filter((application) => application.stage !== 'Offer' && application.stage !== 'Rejected').length;
@@ -457,7 +444,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
 
       const missionControlData: MissionControlData = {
         firstName,
-        greeting: getGreeting(),
+        greeting: getTimeOfDayGreeting(),
         currentDateLabel,
         currentPhase,
         phaseSchedule: profileSeed.phase_schedule.map((phase) => ({
@@ -476,7 +463,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
         totalDsaSolved: dsaProblems.filter((problem) => problem.solved).length,
         activeApplications,
         mocksDone,
-        daysUntilPeakSeason: Math.max(daysUntil('2026-09-15'), 0),
+        daysUntilPeakSeason: getPeakSeasonDashboardState().daysLeft,
         upcomingDeadlines,
         recentActivity,
       };
@@ -489,6 +476,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
       setData(buildFallbackMissionControlData());
       setCompletedTaskIds(new Set());
     } finally {
+      markHydrated(hydratedRef);
       if (!options?.silent) {
         setLoading(false);
       }
@@ -496,6 +484,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
   }, [userId]);
 
   useEffect(() => {
+    resetHydrated(hydratedRef);
     refresh().catch((refreshError: unknown) => {
       console.error('Mission control refresh failed:', refreshError);
       setError('Failed to refresh mission control data');
@@ -504,28 +493,54 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
     });
   }, [refresh]);
 
-  const toggleMissionTask = useCallback((taskId: string) => {
-    setCompletedTaskIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
+  useEffect(() => {
+    if (userId && weeklyGoals.length > 0) {
+      void refresh({ silent: true });
+    }
+  }, [userId, weeklyGoals.length, refresh]);
+
+  const toggleMissionTask = useCallback(
+    (taskId: string) => {
+      if (isWeeklyGoal(taskId)) {
+        toggleWeeklyGoal(taskId);
+        return;
       }
-      return next;
-    });
-  }, []);
+
+      setCompletedTaskIds((previous) => {
+        const next = new Set(previous);
+        if (next.has(taskId)) next.delete(taskId);
+        else next.add(taskId);
+        return next;
+      });
+    },
+    [isWeeklyGoal, toggleWeeklyGoal]
+  );
 
   const resolvedData = useMemo(() => {
     if (!data) return null;
+
+    const today = todayIST();
+    const weeklyCompleted = weeklyGoals.filter(
+      (goal) => goal.start_date <= today && goal.end_date >= today && goal.completed
+    ).length;
+    const weeklyTotal =
+      weeklyGoals.filter((goal) => goal.start_date <= today && goal.end_date >= today).length ||
+      (chooseCurrentOrUpcomingGoal(weeklyGoals, today) ? 1 : 0);
+    const weeklyProgressPercent = calculateWeeklyProgress(weeklyGoals, today);
+
     return {
       ...data,
+      weeklyCompleted,
+      weeklyTotal,
+      weeklyProgressPercent,
       missionTasks: data.missionTasks.map((task) => ({
         ...task,
-        completed: completedTaskIds.has(task.id),
+        completed: isWeeklyGoal(task.id)
+          ? (weeklyGoals.find((goal) => goal.id === task.id)?.completed ?? false)
+          : completedTaskIds.has(task.id),
       })),
     };
-  }, [data, completedTaskIds]);
+  }, [completedTaskIds, data, isWeeklyGoal, weeklyGoals]);
 
   return {
     data: resolvedData,

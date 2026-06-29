@@ -1,20 +1,20 @@
 /**
- * Gemini API client helper (frontend-side).
- * All Gemini calls are proxied through a Supabase Edge Function.
+ * AI Coach API client — proxied through a Supabase Edge Function (Groq).
  */
 
 import type { CoachBriefResult, CoachBriefSource } from '@/types/coach';
+import { getTimeOfDayGreetingPhrase } from '@/utils';
 
-interface GeminiProxyResponse {
+interface CoachProxyResponse {
   brief?: string;
   source?: CoachBriefSource;
   error?: string;
 }
 
 /**
- * Call the Gemini proxy Edge Function to generate an AI brief.
+ * Call the coach proxy Edge Function to generate an AI brief.
  */
-export async function callGeminiBrief(accessToken: string, force = false): Promise<CoachBriefResult> {
+export async function callCoachBrief(accessToken: string, force = false): Promise<CoachBriefResult> {
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gemini-proxy`, {
@@ -27,21 +27,25 @@ export async function callGeminiBrief(accessToken: string, force = false): Promi
     body: JSON.stringify({
       action: 'generate_brief',
       force,
+      greetingPhrase: getTimeOfDayGreetingPhrase(),
     }),
   });
 
-  const data = (await response.json()) as GeminiProxyResponse;
+  const data = (await response.json()) as CoachProxyResponse;
 
   if (!response.ok) {
-    throw new Error(data.error ?? `Gemini proxy error: ${response.statusText}`);
+    throw new Error(data.error ?? `Coach proxy error: ${response.statusText}`);
   }
 
   if (!data.brief) {
-    throw new Error('Gemini proxy returned an empty brief.');
+    throw new Error('Coach proxy returned an empty brief.');
   }
 
   return {
     brief: data.brief,
-    source: data.source ?? 'gemini',
+    source: data.source ?? 'groq',
   };
 }
+
+/** @deprecated Use callCoachBrief */
+export const callGeminiBrief = callCoachBrief;

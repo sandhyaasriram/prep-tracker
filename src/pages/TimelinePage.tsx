@@ -39,7 +39,7 @@ export function TimelinePage({ user }: TimelinePageProps) {
     }
   };
 
-  if (loading) {
+  if (loading && milestones.length === 0) {
     return <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">Loading timeline...</p>;
   }
 
@@ -47,7 +47,7 @@ export function TimelinePage({ user }: TimelinePageProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Timeline</h1>
+          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">The journey, at a glance.</h1>
           <p className="mt-1 text-sm text-[#7A736B] dark:text-[#6B7280]">
             {formatDisplayDate(profileSeed.placement_season.start)} – {formatDisplayDate(profileSeed.placement_season.end)} ·{' '}
             <span className="font-medium text-[#1A1614] dark:text-[#E8EDF2]">{currentPhase}</span> phase

@@ -2,11 +2,13 @@
  * Weekly Review data hook — goals, reviews, auto stats, and CRUD.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSupabaseError } from '@/utils/errors';
 import { buildWeekDefinitions, getCurrentWeekNumber } from '@/utils/weekUtils';
 import { todayIST } from '@/utils';
+import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
+import { runOptimisticMutation } from '@/utils/optimisticMutation';
 import type {
   UpsertWeeklyReviewInput,
   WeekAutoStats,
@@ -26,7 +28,7 @@ interface UseWeeklyReviewDataResult {
   getAutoStats: (weekNumber: number) => Promise<WeekAutoStats>;
   upsertReview: (input: UpsertWeeklyReviewInput) => Promise<void>;
   ensureCurrentWeekReview: () => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 async function fetchAutoStats(userId: string, startDate: string, endDate: string): Promise<WeekAutoStats> {
@@ -72,16 +74,20 @@ export function useWeeklyReviewData(userId: string | null): UseWeeklyReviewDataR
   const [selectedWeekNumber, setSelectedWeekNumber] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hydratedRef = useRef(false);
 
-  const fetchData = useCallback(async (): Promise<void> => {
+  const fetchData = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
       setWeeks([]);
       setReviews([]);
       setLoading(false);
+      resetHydrated(hydratedRef);
       return;
     }
 
-    setLoading(true);
+    if (shouldShowInitialLoading(hydratedRef, options?.silent)) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -106,14 +112,18 @@ export function useWeeklyReviewData(userId: string | null): UseWeeklyReviewDataR
       });
     } catch (fetchError) {
       setError(formatSupabaseError(fetchError));
-      setWeeks([]);
-      setReviews([]);
+      if (!hydratedRef.current) {
+        setWeeks([]);
+        setReviews([]);
+      }
     } finally {
+      markHydrated(hydratedRef);
       setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    resetHydrated(hydratedRef);
     void fetchData();
   }, [fetchData]);
 
@@ -167,11 +177,10 @@ export function useWeeklyReviewData(userId: string | null): UseWeeklyReviewDataR
 
   const upsertReview = useCallback(
     async (input: UpsertWeeklyReviewInput): Promise<void> => {
-      if (!userId) {
-        throw new Error('Not signed in');
-      }
+      if (!userId) throw new Error('Not signed in');
 
       const existing = getReviewForWeek(input.weekNumber);
+      const previous = reviews;
       const payload = {
         biggest_win: input.biggestWin,
         bottleneck: input.bottleneck,
@@ -183,40 +192,76 @@ export function useWeeklyReviewData(userId: string | null): UseWeeklyReviewDataR
       };
 
       if (existing) {
-        const { data, error: updateError } = await supabase
-          .from('weekly_reviews')
-          .update(payload)
-          .eq('id', existing.id)
-          .select('*')
-          .single();
-
-        if (updateError) {
-          throw new Error(formatSupabaseError(updateError));
-        }
-
-        setReviews((current) =>
-          current.map((review) => (review.id === existing.id ? (data as WeeklyReview) : review))
+        const optimistic = reviews.map((review) =>
+          review.id === existing.id ? { ...review, ...payload } : review
         );
+
+        await runOptimisticMutation({
+          apply: () => {
+            setReviews(optimistic);
+          },
+          revert: () => {
+            setReviews(previous);
+          },
+          persist: async () => {
+            const { data, error: updateError } = await supabase
+              .from('weekly_reviews')
+              .update(payload)
+              .eq('id', existing.id)
+              .select('*')
+              .single();
+            if (updateError) throw updateError;
+            setReviews((current) => {
+              const next = current.map((review) => (review.id === existing.id ? (data as WeeklyReview) : review));
+              return next;
+            });
+          },
+          errorMessage: 'Could not save weekly review.',
+        });
         return;
       }
 
-      const { data, error: insertError } = await supabase
-        .from('weekly_reviews')
-        .insert({
-          user_id: userId,
-          week_number: input.weekNumber,
-          ...payload,
-        })
-        .select('*')
-        .single();
+      const tempId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const optimisticReview: WeeklyReview = {
+        id: tempId,
+        user_id: userId,
+        week_number: input.weekNumber,
+        ...payload,
+        created_at: now,
+        updated_at: now,
+      };
+      const optimistic = [...reviews, optimisticReview].sort((a, b) => a.week_number - b.week_number);
 
-      if (insertError) {
-        throw new Error(formatSupabaseError(insertError));
-      }
-
-      setReviews((current) => [...current, data as WeeklyReview].sort((a, b) => a.week_number - b.week_number));
+      await runOptimisticMutation({
+        apply: () => {
+          setReviews(optimistic);
+        },
+        revert: () => {
+          setReviews(previous);
+        },
+        persist: async () => {
+          const { data, error: insertError } = await supabase
+            .from('weekly_reviews')
+            .insert({
+              user_id: userId,
+              week_number: input.weekNumber,
+              ...payload,
+            })
+            .select('*')
+            .single();
+          if (insertError) throw insertError;
+          setReviews((current) => {
+            const next = current
+              .map((review) => (review.id === tempId ? (data as WeeklyReview) : review))
+              .sort((a, b) => a.week_number - b.week_number);
+            return next;
+          });
+        },
+        errorMessage: 'Could not save weekly review.',
+      });
     },
-    [userId, getReviewForWeek]
+    [userId, getReviewForWeek, reviews, weeks]
   );
 
   const getAutoStats = useCallback(

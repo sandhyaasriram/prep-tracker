@@ -3,16 +3,18 @@
  * Renders the sidebar, top navigation, and the primary content area.
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { LogOut, LayoutDashboard, BookOpen, FolderKanban, Target, CalendarDays, Settings, Mic, Layers, Award, PenLine, Sparkles, Search } from 'lucide-react';
 import { Sidebar, SidebarItem, TopNav } from '@/components';
 import { Button } from '@/components/ui';
+import { ToastHost } from '@/components/ui/ToastHost';
+import { PageContent } from '@/components/layout/PageContent';
+import { SkipLink } from '@/components/layout/SkipLink';
 import { CoachPanel } from '@/features/coach/CoachPanel';
 import { KeyboardShortcutsModal } from '@/features/help/KeyboardShortcutsModal';
 import { GlobalSearchModal } from '@/features/search/GlobalSearchModal';
 import { useGeminiCoach } from '@/hooks/useGeminiCoach';
 import { useUserSettings } from '@/hooks/useUserSettings';
-import { clearBriefCache } from '@/utils/coachCache';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/storage';
 import { clearOAuthReturnParams, wasOAuthReturnSuccess } from '@/lib/googleExport';
 import type { User } from '@supabase/supabase-js';
@@ -31,8 +33,6 @@ export type AppNavRoute =
 
 interface MainLayoutProps {
   user: User;
-  progressPercentage: number;
-  progressLabel?: string;
   onSignOut: () => void;
   children: ReactNode;
   activeRoute?: AppNavRoute;
@@ -66,32 +66,45 @@ function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function MainLayout({
   user,
-  progressPercentage,
-  progressLabel,
   onSignOut,
   children,
   activeRoute = 'Dashboard',
   onNavigate,
 }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const { hasGeminiKey, updateGeminiApiKey, loading: settingsLoading } = useUserSettings(user.id);
-  const coach = useGeminiCoach(user.id, hasGeminiKey, !settingsLoading);
-
-  const handleSaveGeminiKey = useCallback(
-    async (apiKey: string): Promise<void> => {
-      await updateGeminiApiKey(apiKey);
-      clearBriefCache();
-      await coach.loadBrief({ force: true, assumeGeminiKey: true });
-    },
-    [updateGeminiApiKey, coach.loadBrief]
-  );
+  const { loading: settingsLoading } = useUserSettings(user.id);
+  const coach = useGeminiCoach(user.id, !settingsLoading);
 
   useEffect(() => {
     setSidebarCollapsedState(getSidebarCollapsed());
   }, []);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeRoute]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setMobileNavOpen(false);
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     if (!wasOAuthReturnSuccess()) {
@@ -148,13 +161,31 @@ export function MainLayout({
     });
   };
 
+  const navCollapsed = mobileNavOpen ? false : sidebarCollapsed;
+
   return (
-    <div className="min-h-screen bg-[#FAF8F4] text-[#1A1614] dark:bg-[#0D0F12] dark:text-[#E8EDF2]">
-      <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={handleToggleSidebar}>
-        {!sidebarCollapsed && (
+    <div className="min-h-screen bg-[#FAF8F4] text-[#1A1614] dark:bg-[#101216] dark:text-[#E2E8F0]">
+      <SkipLink />
+
+      {mobileNavOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-[#1A1614]/45 backdrop-blur-[1px] lg:hidden"
+          aria-label="Close navigation menu"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        collapsed={navCollapsed}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+        onToggleCollapse={handleToggleSidebar}
+      >
+        {!navCollapsed && (
           <div className="mb-4 px-1">
-            <p className="font-display text-2xl text-[#1A1614] dark:text-[#E8EDF2]">Placement OS</p>
-            <p className="mt-1 text-xs font-light italic text-[#7A736B] dark:text-[#6B7280]">Your placement command center</p>
+            <p className="font-display text-2xl text-[#1A1614] dark:text-[#E2E8F0]">Placement OS</p>
+            <p className="mt-1 text-xs font-light italic text-[#7A736B] dark:text-[#94A3B8]">Your placement command center</p>
           </div>
         )}
 
@@ -167,8 +198,15 @@ export function MainLayout({
                 label={item.label}
                 icon={<Icon size={16} />}
                 active={activeRoute === item.label}
-                collapsed={sidebarCollapsed}
-                onClick={onNavigate ? () => onNavigate(item.label) : undefined}
+                collapsed={navCollapsed}
+                onClick={
+                  onNavigate
+                    ? () => {
+                        onNavigate(item.label);
+                        setMobileNavOpen(false);
+                      }
+                    : undefined
+                }
               />
             );
           })}
@@ -176,23 +214,20 @@ export function MainLayout({
       </Sidebar>
 
       <div
-        className={`min-h-screen transition-all duration-200 motion-reduce:transition-none ${
-          sidebarCollapsed ? 'pl-16' : 'pl-64'
-        }`}
+        className={`min-h-screen transition-[padding] duration-200 motion-reduce:transition-none ${
+          sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
+        } pl-0`}
       >
-        <TopNav
-          title={activeRoute}
-          progressPercentage={progressPercentage}
-          {...(progressLabel !== undefined ? { progressLabel } : {})}
-        >
+        <TopNav title={activeRoute} scrollRouteKey={activeRoute} onOpenMobileNav={() => setMobileNavOpen(true)}>
           <Button
             variant="ghost"
             size="sm"
             icon={<Search size={14} />}
             onClick={() => setSearchOpen(true)}
             title="Search (Ctrl/Cmd + K)"
+            aria-label="Search"
           >
-            Search
+            <span className="hidden md:inline">Search</span>
           </Button>
           <Button
             variant={coachOpen ? 'primary' : 'ghost'}
@@ -200,18 +235,21 @@ export function MainLayout({
             icon={<Sparkles size={14} />}
             onClick={() => setCoachOpen((open) => !open)}
             title="AI Coach (Ctrl+Shift+C)"
+            aria-label="AI Coach"
           >
-            Coach
+            <span className="hidden md:inline">Coach</span>
           </Button>
           <div className="hidden items-center gap-2 rounded-full border border-[#E8E3DC] px-3 py-1 text-sm font-normal text-[#7A736B] dark:text-[#6B7280] dark:border-[#232830] md:flex">
             <span className="h-2 w-2 rounded-full bg-[#2D7A4F]" />
             <span>{user.email}</span>
           </div>
-          <Button variant="ghost" size="sm" icon={<LogOut size={14} />} onClick={onSignOut}>
-            Sign out
+          <Button variant="ghost" size="sm" icon={<LogOut size={14} />} onClick={onSignOut} aria-label="Sign out">
+            <span className="hidden sm:inline">Sign out</span>
           </Button>
         </TopNav>
-        <main className="px-4 py-6 md:px-6 lg:px-8">{children}</main>
+        <main id="main-content" className="px-4 py-6 md:px-6 lg:px-8" tabIndex={-1}>
+          <PageContent routeKey={activeRoute}>{children}</PageContent>
+        </main>
       </div>
 
       <CoachPanel
@@ -222,14 +260,13 @@ export function MainLayout({
         loading={coach.loading}
         error={coach.error}
         regenerationsRemaining={coach.regenerationsRemaining}
-        hasGeminiKey={hasGeminiKey}
         onRegenerate={coach.regenerateBrief}
-        onSaveApiKey={handleSaveGeminiKey}
       />
 
       <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} userId={user.id} />
 
       <KeyboardShortcutsModal isOpen={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ToastHost />
     </div>
   );
 }

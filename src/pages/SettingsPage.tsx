@@ -1,11 +1,11 @@
 /**
- * Settings page — profile, theme, data backup, Gemini, and danger zone.
+ * Settings page — profile, theme, data backup, and danger zone.
  */
 
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { Download, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader, Input } from '@/components';
-import { callGeminiBrief } from '@/lib/gemini';
+import { callCoachBrief } from '@/lib/gemini';
 import { supabase } from '@/lib/supabase';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import profileSeed from '@/seed/profile.json';
@@ -24,8 +24,6 @@ export function SettingsPage({ user }: SettingsPageProps) {
   const {
     settings,
     loading,
-    hasGeminiKey,
-    updateGeminiApiKey,
     updateProfile,
     updateThemePreference,
   } = useUserSettings(user.id);
@@ -34,11 +32,10 @@ export function SettingsPage({ user }: SettingsPageProps) {
   const [graduationYear, setGraduationYear] = useState(2026);
   const [targetCompaniesText, setTargetCompaniesText] = useState('');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
-  const [geminiKey, setGeminiKey] = useState('');
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
-  const [geminiMessage, setGeminiMessage] = useState<string | null>(null);
+  const [coachMessage, setCoachMessage] = useState<string | null>(null);
   const [dataMessage, setDataMessage] = useState<string | null>(null);
-  const [testingGemini, setTestingGemini] = useState(false);
+  const [testingCoach, setTestingCoach] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,21 +69,9 @@ export function SettingsPage({ user }: SettingsPageProps) {
     }
   };
 
-  const handleSaveGeminiKey = async (): Promise<void> => {
-    setGeminiMessage(null);
-
-    try {
-      await updateGeminiApiKey(geminiKey);
-      setGeminiKey('');
-      setGeminiMessage('API key saved');
-    } catch (saveError) {
-      setGeminiMessage(saveError instanceof Error ? saveError.message : 'Failed to save API key.');
-    }
-  };
-
-  const handleTestGemini = async (): Promise<void> => {
-    setTestingGemini(true);
-    setGeminiMessage(null);
+  const handleTestCoach = async (): Promise<void> => {
+    setTestingCoach(true);
+    setCoachMessage(null);
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -96,16 +81,12 @@ export function SettingsPage({ user }: SettingsPageProps) {
         throw new Error('Not signed in');
       }
 
-      if (!hasGeminiKey) {
-        throw new Error('Save a Gemini API key first.');
-      }
-
-      await callGeminiBrief(token, true);
-      setGeminiMessage('Connection successful — Gemini proxy responded.');
+      await callCoachBrief(token, true);
+      setCoachMessage('Connection successful — AI Coach responded.');
     } catch (testError) {
-      setGeminiMessage(testError instanceof Error ? testError.message : 'Gemini test failed.');
+      setCoachMessage(testError instanceof Error ? testError.message : 'AI Coach test failed.');
     } finally {
-      setTestingGemini(false);
+      setTestingCoach(false);
     }
   };
 
@@ -175,7 +156,7 @@ export function SettingsPage({ user }: SettingsPageProps) {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Settings</h1>
+        <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Tune your workspace.</h1>
         <p className="mt-1 text-sm text-[#7A736B] dark:text-[#6B7280]">Profile, theme, backups, and workspace controls.</p>
       </div>
 
@@ -235,42 +216,34 @@ export function SettingsPage({ user }: SettingsPageProps) {
 
       <Card>
         <CardHeader>
-          <p className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Gemini API</p>
+          <p className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">AI Coach</p>
         </CardHeader>
         <CardBody className="space-y-3">
           <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">
-            {hasGeminiKey ? 'API key on file in Supabase.' : 'No API key saved yet.'} Used only by the edge function.
+            Daily briefs are generated via Groq (server-side). No API key needed in the app.
           </p>
-          <Input
-            type="password"
-            label="Gemini API key"
-            value={geminiKey}
-            onChange={(event) => setGeminiKey(event.target.value)}
-            placeholder={hasGeminiKey ? 'Paste new key to replace' : 'Paste from Google AI Studio'}
-          />
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" disabled={!geminiKey.trim()} onClick={() => void handleSaveGeminiKey()}>
-              Save key
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Sparkles size={14} />}
-              disabled={testingGemini || !hasGeminiKey}
-              onClick={() => void handleTestGemini()}
-            >
-              Test connection
-            </Button>
-          </div>
-          {geminiMessage && <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">{geminiMessage}</p>}
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Sparkles size={14} />}
+            disabled={testingCoach}
+            onClick={() => void handleTestCoach()}
+          >
+            Test connection
+          </Button>
+          {coachMessage && <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">{coachMessage}</p>}
         </CardBody>
       </Card>
 
       <Card>
         <CardHeader>
           <p className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Data</p>
+          <p className="mt-1 text-sm text-[#7A736B] dark:text-[#6B7280]">Export or restore your workspace</p>
         </CardHeader>
         <CardBody className="space-y-3">
+          <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">
+            Full JSON backup of all tables. Import replaces current data — export first if unsure.
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -279,13 +252,13 @@ export function SettingsPage({ user }: SettingsPageProps) {
               disabled={busyAction !== null}
               onClick={() => void handleExport()}
             >
-              Export JSON
+              {busyAction === 'export' ? 'Exporting...' : 'Export all as JSON'}
             </Button>
             <label className="inline-flex">
               <input type="file" accept="application/json,.json" className="hidden" onChange={(event) => void handleImport(event)} />
               <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#E8E3DC] bg-white px-3 py-2 text-sm text-[#1A1614] transition-colors hover:bg-[#F3F0EB] dark:border-[#232830] dark:bg-[#1C2028] dark:text-[#E8EDF2] dark:hover:bg-[#232830]">
                 <Upload size={14} />
-                Import JSON
+                {busyAction === 'import' ? 'Importing...' : 'Import from JSON'}
               </span>
             </label>
           </div>

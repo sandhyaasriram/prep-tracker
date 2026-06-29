@@ -184,7 +184,7 @@ export function DSAPage({ user }: DSAPageProps) {
     setRevisionSessionOpen(true);
   };
 
-  if (loading || !data || !stats) {
+  if (loading && !data) {
     return (
       <div className="grid min-h-[50vh] place-items-center rounded-2xl border border-[#E8E3DC] bg-white p-8 dark:border-[#232830] dark:bg-[#13161A]">
         <div className="space-y-3 text-center">
@@ -194,6 +194,10 @@ export function DSAPage({ user }: DSAPageProps) {
         </div>
       </div>
     );
+  }
+
+  if (!data || !stats) {
+    return null;
   }
 
   return (

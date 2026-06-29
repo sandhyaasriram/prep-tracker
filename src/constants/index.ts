@@ -5,6 +5,9 @@
 export const APP_NAME = 'Placement OS';
 export const APP_VERSION = '0.1.0';
 
+/** Peak season start date (YYYY-MM-DD) — matches profile seed phase schedule. */
+export const PEAK_SEASON_START = '2026-09-15';
+
 export const PHASES = {
   PRE_COLLEGE: 'Pre-College',
   EARLY_SEMESTER: 'Early Semester',

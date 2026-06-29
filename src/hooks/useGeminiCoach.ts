@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { callGeminiBrief } from '@/lib/gemini';
+import { callCoachBrief } from '@/lib/gemini';
 import {
   clearBriefCache,
   consumeRegeneration,
@@ -19,8 +19,6 @@ import type { CoachBriefSource } from '@/types/coach';
 
 interface LoadBriefOptions {
   force?: boolean;
-  /** Use after saving a key before settings state has re-rendered. */
-  assumeGeminiKey?: boolean;
 }
 
 interface UseGeminiCoachResult {
@@ -36,11 +34,7 @@ interface UseGeminiCoachResult {
 /**
  * Manage daily AI coach brief with cache and fallback behavior.
  */
-export function useGeminiCoach(
-  userId: string | null,
-  hasGeminiKey: boolean,
-  settingsReady: boolean
-): UseGeminiCoachResult {
+export function useGeminiCoach(userId: string | null, settingsReady = true): UseGeminiCoachResult {
   const [brief, setBrief] = useState('');
   const [source, setSource] = useState<CoachBriefSource>('fallback');
   const [loading, setLoading] = useState(false);
@@ -54,14 +48,13 @@ export function useGeminiCoach(
       }
 
       const force = options?.force ?? false;
-      const canUseGemini = options?.assumeGeminiKey ?? hasGeminiKey;
 
       if (!force && hasValidBriefCache()) {
         const cached = readCachedBriefText();
         const cachedSource = readCachedBriefSource();
         if (cached) {
           setBrief(cached);
-          setSource(cachedSource ?? (canUseGemini ? 'gemini' : 'fallback'));
+          setSource(cachedSource ?? 'groq');
           setError(null);
           return;
         }
@@ -74,21 +67,20 @@ export function useGeminiCoach(
         const context = await buildCoachContext(userId);
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
-        let geminiFailed = false;
+        let aiFailed = false;
 
-        if (canUseGemini && accessToken) {
+        if (accessToken) {
           try {
-            const result = await callGeminiBrief(accessToken, force);
+            const result = await callCoachBrief(accessToken, force);
             setBrief(result.brief);
             setSource(result.source);
             writeCachedBrief(result.brief, result.source);
             setRegenerationsRemaining(getRegenerationsRemaining());
             return;
           } catch (proxyError) {
-            geminiFailed = true;
-            console.warn('Gemini proxy unavailable, using fallback brief.', proxyError);
-            const message =
-              proxyError instanceof Error ? proxyError.message : 'Gemini request failed.';
+            aiFailed = true;
+            console.warn('Coach proxy unavailable, using fallback brief.', proxyError);
+            const message = proxyError instanceof Error ? proxyError.message : 'Coach request failed.';
             setError(`AI brief unavailable (${message}). Using rules-based brief below.`);
           }
         }
@@ -98,8 +90,8 @@ export function useGeminiCoach(
         setSource('fallback');
         writeCachedBrief(fallbackBrief, 'fallback');
 
-        if (!canUseGemini && !geminiFailed) {
-          setError('Add your Gemini API key in the section above to enable AI-generated briefs.');
+        if (!accessToken && !aiFailed) {
+          setError('Sign in to enable AI-generated briefs.');
         }
       } catch (loadError) {
         const message = loadError instanceof Error ? loadError.message : 'Failed to load coach brief.';
@@ -118,7 +110,7 @@ export function useGeminiCoach(
         setRegenerationsRemaining(getRegenerationsRemaining());
       }
     },
-    [userId, hasGeminiKey, settingsReady]
+    [userId, settingsReady]
   );
 
   const regenerateBrief = useCallback(async (): Promise<void> => {
@@ -130,14 +122,14 @@ export function useGeminiCoach(
 
     clearBriefCache();
     setRegenerationsRemaining(getRegenerationsRemaining());
-    await loadBrief({ force: true, assumeGeminiKey: hasGeminiKey });
-  }, [loadBrief, hasGeminiKey]);
+    await loadBrief({ force: true });
+  }, [loadBrief]);
 
   useEffect(() => {
     if (userId && settingsReady) {
       void loadBrief();
     }
-  }, [userId, hasGeminiKey, settingsReady, loadBrief]);
+  }, [userId, settingsReady, loadBrief]);
 
   return {
     brief,

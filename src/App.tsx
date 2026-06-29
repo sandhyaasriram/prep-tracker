@@ -4,23 +4,42 @@
  */
 
 import { LoginPage } from '@/pages/LoginPage';
-import { MissionControlPage } from '@/pages/MissionControlPage';
-import { DSAPage } from '@/pages/DSAPage';
-import { ApplicationsPage } from '@/pages/ApplicationsPage';
-import { InterviewPrepPage } from '@/pages/InterviewPrepPage';
-import { ProjectsPage } from '@/pages/ProjectsPage';
-import { CertificationsPage } from '@/pages/CertificationsPage';
-import { JournalPage } from '@/pages/JournalPage';
-import { WeeklyReviewPage } from '@/pages/WeeklyReviewPage';
-import { TimelinePage } from '@/pages/TimelinePage';
-import { SettingsPage } from '@/pages/SettingsPage';
 import { GoogleOAuthCallbackPage } from '@/pages/GoogleOAuthCallbackPage';
 import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
+import { PageFallback } from '@/components/layout/PageFallback';
 import { Button } from '@/components/ui';
+import { WeeklyGoalsProvider } from '@/context/WeeklyGoalsContext';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavProgress } from '@/hooks/useNavProgress';
 import { useSeedUserData } from '@/hooks/useSeedUserData';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import type { User } from '@supabase/supabase-js';
+
+const MissionControlPage = lazy(() =>
+  import('@/pages/MissionControlPage').then((module) => ({ default: module.MissionControlPage }))
+);
+const DSAPage = lazy(() => import('@/pages/DSAPage').then((module) => ({ default: module.DSAPage })));
+const ApplicationsPage = lazy(() =>
+  import('@/pages/ApplicationsPage').then((module) => ({ default: module.ApplicationsPage }))
+);
+const InterviewPrepPage = lazy(() =>
+  import('@/pages/InterviewPrepPage').then((module) => ({ default: module.InterviewPrepPage }))
+);
+const ProjectsPage = lazy(() =>
+  import('@/pages/ProjectsPage').then((module) => ({ default: module.ProjectsPage }))
+);
+const CertificationsPage = lazy(() =>
+  import('@/pages/CertificationsPage').then((module) => ({ default: module.CertificationsPage }))
+);
+const JournalPage = lazy(() => import('@/pages/JournalPage').then((module) => ({ default: module.JournalPage })));
+const WeeklyReviewPage = lazy(() =>
+  import('@/pages/WeeklyReviewPage').then((module) => ({ default: module.WeeklyReviewPage }))
+);
+const TimelinePage = lazy(() =>
+  import('@/pages/TimelinePage').then((module) => ({ default: module.TimelinePage }))
+);
+const SettingsPage = lazy(() =>
+  import('@/pages/SettingsPage').then((module) => ({ default: module.SettingsPage }))
+);
 
 type HashRoute =
   | ''
@@ -34,6 +53,64 @@ type HashRoute =
   | 'timeline'
   | 'settings';
 
+interface AuthenticatedAppProps {
+  user: User;
+  route: AppNavRoute;
+  onSignOut: () => void;
+  children: ReactNode;
+}
+
+function AuthenticatedApp({ user, route, onSignOut, children }: AuthenticatedAppProps) {
+  return (
+    <MainLayout
+      user={user}
+      onSignOut={onSignOut}
+      activeRoute={route}
+      onNavigate={(nextRoute) => {
+        if (nextRoute === 'DSA') {
+          window.location.hash = 'dsa';
+          return;
+        }
+        if (nextRoute === 'Applications') {
+          window.location.hash = 'applications';
+          return;
+        }
+        if (nextRoute === 'Interview Prep') {
+          window.location.hash = 'interview-prep';
+          return;
+        }
+        if (nextRoute === 'Projects') {
+          window.location.hash = 'projects';
+          return;
+        }
+        if (nextRoute === 'Certifications') {
+          window.location.hash = 'certifications';
+          return;
+        }
+        if (nextRoute === 'Journal') {
+          window.location.hash = 'journal';
+          return;
+        }
+        if (nextRoute === 'Weekly Review') {
+          window.location.hash = 'weekly-review';
+          return;
+        }
+        if (nextRoute === 'Timeline') {
+          window.location.hash = 'timeline';
+          return;
+        }
+        if (nextRoute === 'Settings') {
+          window.location.hash = 'settings';
+          return;
+        }
+        window.location.hash = '';
+      }}
+    >
+      {children}
+    </MainLayout>
+  );
+}
+
 export default function App() {
   const isGoogleCallback =
     window.location.pathname === '/auth/google/callback' ||
@@ -42,7 +119,6 @@ export default function App() {
   const { seeding, error: seedError, retry: retrySeed, dismissError: dismissSeedError } = useSeedUserData(user?.id ?? null);
   const [route, setRoute] = useState<AppNavRoute>('Dashboard');
   const [seedErrorDismissed, setSeedErrorDismissed] = useState(false);
-  const { progress: navProgress, label: navProgressLabel } = useNavProgress(user?.id ?? null, route);
 
   useEffect(() => {
     const syncRoute = (): void => {
@@ -106,7 +182,7 @@ export default function App() {
 
   if (loading || seeding) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] dark:bg-[#0D0F12]">
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] dark:bg-[#101216]">
         <div className="space-y-3 text-center">
           <h1 className="font-display text-4xl text-[#1A1614] dark:text-[#E8EDF2]">Placement OS</h1>
           <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">{loading ? 'Checking authentication...' : 'Seeding your workspace...'}</p>
@@ -117,8 +193,8 @@ export default function App() {
 
   if (seedError && !seedErrorDismissed) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] px-6 dark:bg-[#0D0F12]">
-        <div className="max-w-lg rounded-2xl border border-[#E8622A]/30 bg-white p-6 text-left shadow-sm dark:border-[#E8622A]/30 dark:bg-[#13161A]">
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] px-6 dark:bg-[#101216]">
+        <div className="max-w-lg rounded-2xl border border-[#E8622A]/30 bg-white p-6 text-left shadow-sm dark:border-[#E8622A]/30 dark:bg-[#161A20]">
           <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Placement OS</h1>
           <p className="mt-3 text-sm text-[#7A736B] dark:text-[#6B7280]">Seeding hit a problem:</p>
           <p className="mt-2 rounded-xl border border-[#E8622A]/20 bg-[#E8622A]/5 px-3 py-2 text-sm text-[#1A1614] dark:text-[#E8EDF2]">
@@ -158,79 +234,40 @@ export default function App() {
   }
 
   const renderRoute = (): JSX.Element => {
-    switch (route) {
-      case 'DSA':
-        return <DSAPage user={user} />;
-      case 'Applications':
-        return <ApplicationsPage user={user} />;
-      case 'Interview Prep':
-        return <InterviewPrepPage user={user} />;
-      case 'Projects':
-        return <ProjectsPage user={user} />;
-      case 'Certifications':
-        return <CertificationsPage user={user} />;
-      case 'Journal':
-        return <JournalPage user={user} />;
-      case 'Weekly Review':
-        return <WeeklyReviewPage user={user} />;
-      case 'Timeline':
-        return <TimelinePage user={user} />;
-      case 'Settings':
-        return <SettingsPage user={user} />;
-      case 'Dashboard':
-      default:
-        return <MissionControlPage user={user} />;
-    }
+    const page = (() => {
+      switch (route) {
+        case 'DSA':
+          return <DSAPage user={user} />;
+        case 'Applications':
+          return <ApplicationsPage user={user} />;
+        case 'Interview Prep':
+          return <InterviewPrepPage user={user} />;
+        case 'Projects':
+          return <ProjectsPage user={user} />;
+        case 'Certifications':
+          return <CertificationsPage user={user} />;
+        case 'Journal':
+          return <JournalPage user={user} />;
+        case 'Weekly Review':
+          return <WeeklyReviewPage user={user} />;
+        case 'Timeline':
+          return <TimelinePage user={user} />;
+        case 'Settings':
+          return <SettingsPage user={user} />;
+        case 'Dashboard':
+        default:
+          return <MissionControlPage user={user} />;
+      }
+    })();
+
+    return <Suspense fallback={<PageFallback />}>{page}</Suspense>;
   };
 
   return (
-    <MainLayout
-      user={user}
-      progressPercentage={navProgress}
-      progressLabel={navProgressLabel}
-      onSignOut={signOut}
-      activeRoute={route}
-      onNavigate={(nextRoute) => {
-        if (nextRoute === 'DSA') {
-          window.location.hash = 'dsa';
-          return;
-        }
-        if (nextRoute === 'Applications') {
-          window.location.hash = 'applications';
-          return;
-        }
-        if (nextRoute === 'Interview Prep') {
-          window.location.hash = 'interview-prep';
-          return;
-        }
-        if (nextRoute === 'Projects') {
-          window.location.hash = 'projects';
-          return;
-        }
-        if (nextRoute === 'Certifications') {
-          window.location.hash = 'certifications';
-          return;
-        }
-        if (nextRoute === 'Journal') {
-          window.location.hash = 'journal';
-          return;
-        }
-        if (nextRoute === 'Weekly Review') {
-          window.location.hash = 'weekly-review';
-          return;
-        }
-        if (nextRoute === 'Timeline') {
-          window.location.hash = 'timeline';
-          return;
-        }
-        if (nextRoute === 'Settings') {
-          window.location.hash = 'settings';
-          return;
-        }
-        window.location.hash = '';
-      }}
-    >
-      {renderRoute()}
-    </MainLayout>
+    <WeeklyGoalsProvider userId={user.id}>
+      <AuthenticatedApp user={user} route={route} onSignOut={signOut}>
+        {renderRoute()}
+      </AuthenticatedApp>
+    </WeeklyGoalsProvider>
   );
 }

@@ -12,7 +12,58 @@
   }
 
   html[data-theme='dark'] body {
-    @apply bg-[#0D0F12] text-[#E8EDF2];
+    @apply bg-[#101216] text-[#E2E8F0];
+    line-height: 1.65;
+  }
+
+  html[data-theme='dark'] ::selection {
+    @apply bg-[#5B5FEF]/40 text-[#F8FAFC];
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-[#5B5FEF] ring-offset-2 ring-offset-[#FAF8F4];
+  }
+
+  html[data-theme='dark'] :focus-visible {
+    @apply ring-[#6B6FF5] ring-offset-[#101216];
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .focus\:not-sr-only:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: inherit;
+    margin: inherit;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .page-enter {
+    animation: page-enter 0.22s ease-out;
   }
 
   h1 {
@@ -82,7 +133,7 @@
   }
 
   html[data-theme='dark'] .card {
-    @apply bg-[#13161A] border-[#232830];
+    @apply bg-[#161A20] border-transparent shadow-none;
   }
 
   .input-base {
@@ -90,7 +141,11 @@
   }
 
   html[data-theme='dark'] .input-base {
-    @apply bg-[#1C2028] text-[#E8EDF2] border-[#232830] focus:ring-[#6B6FF5];
+    @apply bg-[#1A1F26] text-[#E2E8F0] border-[#FFFFFF]/[0.06] focus:ring-[#6B6FF5];
+  }
+
+  html[data-theme='dark'] .badge-tonal {
+    filter: saturate(0.72) brightness(0.95);
   }
 
   .badge {
@@ -195,5 +250,9 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .page-enter {
+    animation: none !important;
   }
 }

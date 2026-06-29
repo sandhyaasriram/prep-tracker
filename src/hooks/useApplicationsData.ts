@@ -3,10 +3,12 @@
  * Fetches applications with interview rounds and exposes CRUD + filtering.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSupabaseError } from '@/utils/errors';
 import { todayIST } from '@/utils';
+import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
+import { runOptimisticMutation } from '@/utils/optimisticMutation';
 import type { Application, ApplicationStage, InterviewRound } from '@/types';
 import type {
   AddApplicationInput,
@@ -111,15 +113,19 @@ export function useApplicationsData(userId: string | null): UseApplicationsDataR
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ApplicationFilters>(DEFAULT_FILTERS);
+  const hydratedRef = useRef(false);
 
-  const fetchData = useCallback(async (): Promise<void> => {
+  const fetchData = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
       setAllApplications([]);
       setLoading(false);
+      resetHydrated(hydratedRef);
       return;
     }
 
-    setLoading(true);
+    if (shouldShowInitialLoading(hydratedRef, options?.silent)) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -152,16 +158,21 @@ export function useApplicationsData(userId: string | null): UseApplicationsDataR
         rounds = (roundsResult.data ?? []) as InterviewRound[];
       }
 
-      setAllApplications(mergeApplications(applications, rounds));
+      const merged = mergeApplications(applications, rounds);
+      setAllApplications(merged);
     } catch (fetchError) {
       setError(formatSupabaseError(fetchError));
-      setAllApplications([]);
+      if (!hydratedRef.current) {
+        setAllApplications([]);
+      }
     } finally {
+      markHydrated(hydratedRef);
       setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    resetHydrated(hydratedRef);
     void fetchData();
   }, [fetchData]);
 
@@ -184,11 +195,12 @@ export function useApplicationsData(userId: string | null): UseApplicationsDataR
 
   const addApplication = useCallback(
     async (input: AddApplicationInput): Promise<void> => {
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
+      if (!userId) throw new Error('Not authenticated');
 
-      const payload = {
+      const tempId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const optimisticApp: ApplicationWithRounds = {
+        id: tempId,
         user_id: userId,
         company: input.company.trim(),
         role: input.role.trim(),
@@ -198,54 +210,116 @@ export function useApplicationsData(userId: string | null): UseApplicationsDataR
         next_deadline: input.nextDeadline ?? null,
         oa_score: input.oaScore ?? null,
         notes: input.notes?.trim() ?? '',
+        created_at: now,
+        updated_at: now,
+        rounds: [],
       };
+      const previous = allApplications;
 
-      const { error: insertError } = await supabase.from('applications').insert([payload]);
-
-      if (insertError) {
-        throw new Error(formatSupabaseError(insertError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => {
+          const next = [optimisticApp, ...allApplications];
+          setAllApplications(next);
+        },
+        revert: () => {
+          setAllApplications(previous);
+        },
+        persist: async () => {
+          const { data: inserted, error: insertError } = await supabase
+            .from('applications')
+            .insert([
+              {
+                user_id: userId,
+                company: optimisticApp.company,
+                role: optimisticApp.role,
+                source: optimisticApp.source,
+                stage: optimisticApp.stage,
+                date_applied: optimisticApp.date_applied,
+                next_deadline: optimisticApp.next_deadline,
+                oa_score: optimisticApp.oa_score,
+                notes: optimisticApp.notes,
+              },
+            ])
+            .select('*')
+            .single();
+          if (insertError) throw insertError;
+          setAllApplications((current) => {
+            const next = current.map((app) =>
+              app.id === tempId ? { ...(inserted as Application), rounds: [] } : app
+            );
+            return next;
+          });
+        },
+        errorMessage: 'Could not add application.',
+      });
     },
-    [userId, fetchData]
+    [allApplications, userId]
   );
 
   const updateApplication = useCallback(
     async (id: string, input: UpdateApplicationInput): Promise<void> => {
-      const payload: Record<string, unknown> = {};
+      const previous = allApplications;
+      const optimistic = allApplications.map((app) =>
+        app.id !== id
+          ? app
+          : {
+              ...app,
+              company: input.company !== undefined ? input.company.trim() : app.company,
+              role: input.role !== undefined ? input.role.trim() : app.role,
+              source: input.source !== undefined ? input.source : app.source,
+              stage: input.stage !== undefined ? input.stage : app.stage,
+              date_applied: input.dateApplied !== undefined ? input.dateApplied : app.date_applied,
+              next_deadline: input.nextDeadline !== undefined ? input.nextDeadline : app.next_deadline,
+              oa_score: input.oaScore !== undefined ? input.oaScore : app.oa_score,
+              notes: input.notes !== undefined ? input.notes.trim() : app.notes,
+            }
+      );
 
-      if (input.company !== undefined) payload.company = input.company.trim();
-      if (input.role !== undefined) payload.role = input.role.trim();
-      if (input.source !== undefined) payload.source = input.source;
-      if (input.stage !== undefined) payload.stage = input.stage;
-      if (input.dateApplied !== undefined) payload.date_applied = input.dateApplied;
-      if (input.nextDeadline !== undefined) payload.next_deadline = input.nextDeadline;
-      if (input.oaScore !== undefined) payload.oa_score = input.oaScore;
-      if (input.notes !== undefined) payload.notes = input.notes.trim();
-
-      const { error: updateError } = await supabase.from('applications').update(payload).eq('id', id);
-
-      if (updateError) {
-        throw new Error(formatSupabaseError(updateError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => {
+          setAllApplications(optimistic);
+        },
+        revert: () => {
+          setAllApplications(previous);
+        },
+        persist: async () => {
+          const payload: Record<string, unknown> = {};
+          if (input.company !== undefined) payload.company = input.company.trim();
+          if (input.role !== undefined) payload.role = input.role.trim();
+          if (input.source !== undefined) payload.source = input.source;
+          if (input.stage !== undefined) payload.stage = input.stage;
+          if (input.dateApplied !== undefined) payload.date_applied = input.dateApplied;
+          if (input.nextDeadline !== undefined) payload.next_deadline = input.nextDeadline;
+          if (input.oaScore !== undefined) payload.oa_score = input.oaScore;
+          if (input.notes !== undefined) payload.notes = input.notes.trim();
+          const { error: updateError } = await supabase.from('applications').update(payload).eq('id', id);
+          if (updateError) throw updateError;
+        },
+        errorMessage: 'Could not update application.',
+      });
     },
-    [fetchData]
+    [allApplications]
   );
 
   const deleteApplication = useCallback(
     async (id: string): Promise<void> => {
-      const { error: deleteError } = await supabase.from('applications').delete().eq('id', id);
-
-      if (deleteError) {
-        throw new Error(formatSupabaseError(deleteError));
-      }
-
-      await fetchData();
+      const previous = allApplications;
+      const optimistic = allApplications.filter((app) => app.id !== id);
+      await runOptimisticMutation({
+        apply: () => {
+          setAllApplications(optimistic);
+        },
+        revert: () => {
+          setAllApplications(previous);
+        },
+        persist: async () => {
+          const { error: deleteError } = await supabase.from('applications').delete().eq('id', id);
+          if (deleteError) throw deleteError;
+        },
+        errorMessage: 'Could not delete application.',
+      });
     },
-    [fetchData]
+    [allApplications]
   );
 
   const updateStage = useCallback(
@@ -258,44 +332,82 @@ export function useApplicationsData(userId: string | null): UseApplicationsDataR
   const addInterviewRound = useCallback(
     async (input: AddInterviewRoundInput): Promise<void> => {
       const application = allApplications.find((app) => app.id === input.applicationId);
+      if (!application) throw new Error('Application not found');
 
-      if (!application) {
-        throw new Error('Application not found');
-      }
-
-      const nextRoundNumber = application.rounds.length + 1;
-
-      const payload = {
+      const tempId = crypto.randomUUID();
+      const nextRound: InterviewRound = {
+        id: tempId,
         application_id: input.applicationId,
-        round_number: nextRoundNumber,
+        round_number: application.rounds.length + 1,
         type: input.type,
         date: input.date ?? null,
         outcome: input.outcome?.trim() ?? '',
         notes: input.notes?.trim() ?? '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
+      const previous = allApplications;
+      const optimistic = allApplications.map((app) =>
+        app.id === input.applicationId ? { ...app, rounds: [...app.rounds, nextRound] } : app
+      );
 
-      const { error: insertError } = await supabase.from('interview_rounds').insert([payload]);
-
-      if (insertError) {
-        throw new Error(formatSupabaseError(insertError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => setAllApplications(optimistic),
+        revert: () => setAllApplications(previous),
+        persist: async () => {
+          const { data: inserted, error: insertError } = await supabase
+            .from('interview_rounds')
+            .insert([
+              {
+                application_id: input.applicationId,
+                round_number: nextRound.round_number,
+                type: input.type,
+                date: input.date ?? null,
+                outcome: input.outcome?.trim() ?? '',
+                notes: input.notes?.trim() ?? '',
+              },
+            ])
+            .select('*')
+            .single();
+          if (insertError) throw insertError;
+          setAllApplications((current) =>
+            current.map((app) =>
+              app.id === input.applicationId
+                ? {
+                    ...app,
+                    rounds: app.rounds.map((round) =>
+                      round.id === tempId ? (inserted as InterviewRound) : round
+                    ),
+                  }
+                : app
+            )
+          );
+        },
+        errorMessage: 'Could not add interview round.',
+      });
     },
-    [allApplications, fetchData]
+    [allApplications]
   );
 
   const deleteInterviewRound = useCallback(
     async (roundId: string): Promise<void> => {
-      const { error: deleteError } = await supabase.from('interview_rounds').delete().eq('id', roundId);
+      const previous = allApplications;
+      const optimistic = allApplications.map((app) => ({
+        ...app,
+        rounds: app.rounds.filter((round) => round.id !== roundId),
+      }));
 
-      if (deleteError) {
-        throw new Error(formatSupabaseError(deleteError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => setAllApplications(optimistic),
+        revert: () => setAllApplications(previous),
+        persist: async () => {
+          const { error: deleteError } = await supabase.from('interview_rounds').delete().eq('id', roundId);
+          if (deleteError) throw deleteError;
+        },
+        errorMessage: 'Could not delete interview round.',
+      });
     },
-    [fetchData]
+    [allApplications]
   );
 
   return {

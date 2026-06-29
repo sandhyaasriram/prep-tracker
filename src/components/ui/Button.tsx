@@ -21,9 +21,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variantClass: Record<string, string> = {
-      primary: 'bg-[#5B5FEF] text-white hover:shadow-md active:scale-95 focus:ring-[#5B5FEF]',
-      secondary: 'bg-[#F3F0EB] text-[#1A1614] hover:shadow-sm active:scale-95 focus:ring-[#5B5FEF]',
-      ghost: 'text-[#1A1614] hover:bg-[#F3F0EB] active:scale-95 focus:ring-[#5B5FEF]',
+      primary:
+        'bg-[#5B5FEF] text-white hover:shadow-md active:scale-95 focus:ring-[#5B5FEF] dark:bg-[#5B5FEF] dark:hover:bg-[#6B6FF5] dark:text-white',
+      secondary:
+        'bg-[#F3F0EB] text-[#1A1614] hover:shadow-sm active:scale-95 focus:ring-[#5B5FEF] dark:bg-[#1A1F26] dark:text-[#E2E8F0] dark:hover:bg-[#222830]',
+      ghost:
+        'text-[#1A1614] hover:bg-[#F3F0EB] active:scale-95 focus:ring-[#5B5FEF] dark:text-[#E2E8F0] dark:hover:bg-[#1A1F26]',
     };
 
     const sizeClass: Record<string, string> = {
@@ -32,18 +35,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       lg: 'px-6 py-3 text-lg',
     };
 
-    const darkMode = `dark:bg-[#1C2028] dark:text-[#E8EDF2] dark:focus:ring-[#6B6FF5]`;
-    const darkVariant =
-      variant === 'secondary'
-        ? `${darkMode}`
-        : variant === 'ghost'
-          ? `${darkMode} dark:hover:bg-[#1C2028]`
-          : `${darkMode}`;
-
     return (
       <button
         ref={ref}
-        className={`${baseClass} ${variantClass[variant]} ${sizeClass[size]} ${darkVariant} ${className}`}
+        className={`${baseClass} ${variantClass[variant]} ${sizeClass[size]} dark:focus:ring-[#6B6FF5] dark:focus:ring-offset-[#101216] motion-reduce:active:scale-100 ${className}`}
         disabled={isLoading || props.disabled}
         {...props}
       >

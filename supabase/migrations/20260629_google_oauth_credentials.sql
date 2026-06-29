@@ -12,6 +12,8 @@ create table if not exists public.google_oauth_credentials (
 
 alter table public.google_oauth_credentials enable row level security;
 
+drop trigger if exists set_google_oauth_credentials_updated_at on public.google_oauth_credentials;
+
 create trigger set_google_oauth_credentials_updated_at
 before update on public.google_oauth_credentials
 for each row execute function public.set_updated_at();

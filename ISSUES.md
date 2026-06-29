@@ -10,25 +10,22 @@ Tracked follow-ups that are not blockers but worth doing later.
 **Phase:** 9 (AI Coach)  
 **Priority:** Medium
 
-The daily brief works (Gemini + rules fallback), but the prompt needs iteration for better, more useful output.
+The daily brief works (Groq + rules fallback), but the prompt can still be iterated for sharper output.
 
 **Where to change:**
-- **Gemini prompt:** `supabase/functions/gemini-proxy/index.ts` → `buildPrompt()`
-- **Rules fallback copy:** `src/utils/coachContext.ts` → `generateCoachFallbackBrief()`
-
-**Ideas to explore:**
-- Richer context (applications by stage, recent journal, weekly goals, project gaps)
-- Sharper task wording — company/role-specific, not generic
-- Time-of-day greeting (morning vs evening)
-- Tone calibration (direct but actionable vs too sparse)
-- Stronger output format constraints so Gemini stays on-template
-- Align fallback brief structure with Gemini brief so both feel consistent
+- **Groq prompt:** `supabase/functions/gemini-proxy/index.ts` → `buildPrompt()`
+- **Rules fallback copy:** `src/utils/coachPrompt.ts` → `generateCoachFallbackBrief()`
 
 **Acceptance:** Regenerated briefs feel specific to live data, not boilerplate; tasks are prioritized and time-estimated realistically.
 
 ---
 
-## Dark Mode 
+## Resolved in Phase 12
 
-Too dark - feels too cluttered
-dark mode supposed to make you feel relaxed, feels like overwhelming noise
+### Progress bar / mutation UX
+- **Was:** Full-page reloads and hard refresh needed after checkbox ticks and form saves.
+- **Fixed:** Optimistic local-state mutations app-wide; top nav bar is now a scroll indicator (not weekly goal %).
+
+### Dark mode clutter
+- **Was:** Too dark and visually noisy.
+- **Fixed (Phase 12):** Softer surfaces (`#101216` / `#161A20`), desaturated badges, borderless cards, fixed primary button color in dark mode, improved line-height and focus rings.

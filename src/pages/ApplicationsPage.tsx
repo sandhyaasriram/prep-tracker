@@ -77,7 +77,7 @@ export function ApplicationsPage({ user }: ApplicationsPageProps) {
     }));
   }, [data]);
 
-  if (loading) {
+  if (loading && !data) {
     return <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">Loading applications...</p>;
   }
 
@@ -97,7 +97,7 @@ export function ApplicationsPage({ user }: ApplicationsPageProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Applications</h1>
+          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Every opportunity accounted for.</h1>
           <p className="mt-1 text-sm text-[#7A736B] dark:text-[#6B7280]">
             Track your pipeline from wishlist through offer.
           </p>

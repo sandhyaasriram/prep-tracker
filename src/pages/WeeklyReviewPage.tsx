@@ -100,7 +100,7 @@ export function WeeklyReviewPage({ user }: WeeklyReviewPageProps) {
     }
   };
 
-  if (loading) {
+  if (loading && !data) {
     return <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">Loading weekly review...</p>;
   }
 
@@ -124,7 +124,7 @@ export function WeeklyReviewPage({ user }: WeeklyReviewPageProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Weekly Review</h1>
+          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Reflect. Reset. Refocus.</h1>
           <p className="mt-1 text-sm text-[#7A736B] dark:text-[#6B7280]">
             One structured reflection per week — auto stats from your trackers.
           </p>

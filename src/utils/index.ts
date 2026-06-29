@@ -3,17 +3,56 @@
  */
 
 import { addDays, differenceInCalendarDays, format, parse } from 'date-fns';
-import { DISPLAY_DATE_FORMAT, DISPLAY_DATETIME_FORMAT, DATE_FORMAT, IST_OFFSET_MS } from '@/constants';
+import { DISPLAY_DATE_FORMAT, DISPLAY_DATETIME_FORMAT, DATE_FORMAT, IST_OFFSET_MS, PEAK_SEASON_START } from '@/constants';
+
+const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T/;
+
+/**
+ * Format a UTC ISO timestamp for display in IST (e.g. "29 Jun 26 · 23:10 IST").
+ * Date-only strings (YYYY-MM-DD) render as "29 Jun 26" without a time segment.
+ */
+export function formatTimestampIST(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = parse(value, DATE_FORMAT, new Date());
+    return format(date, 'dd MMM yy');
+  }
+
+  if (!ISO_TIMESTAMP_PATTERN.test(value)) {
+    return value;
+  }
+
+  const utc = new Date(value);
+  if (Number.isNaN(utc.getTime())) {
+    return value;
+  }
+
+  const ist = new Date(utc.getTime() + IST_OFFSET_MS);
+  const datePart = format(
+    new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate())),
+    'dd MMM yy'
+  );
+  const hours = String(ist.getUTCHours()).padStart(2, '0');
+  const minutes = String(ist.getUTCMinutes()).padStart(2, '0');
+
+  return `${datePart} · ${hours}:${minutes} IST`;
+}
 
 /**
  * Format a date string for display (e.g., "Jan 15, 2026").
  */
 export function formatDisplayDate(dateString: string): string {
+  if (ISO_TIMESTAMP_PATTERN.test(dateString)) {
+    return formatTimestampIST(dateString).split(' · ')[0] ?? formatTimestampIST(dateString);
+  }
+
   try {
     const date = parse(dateString, DATE_FORMAT, new Date());
     return format(date, DISPLAY_DATE_FORMAT);
   } catch {
-    return dateString;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return format(parse(dateString, DATE_FORMAT, new Date()), DISPLAY_DATE_FORMAT);
+    }
+    return '—';
   }
 }
 
@@ -21,11 +60,18 @@ export function formatDisplayDate(dateString: string): string {
  * Format a date string with time for display (e.g., "Jan 15, 2026 2:30 PM").
  */
 export function formatDisplayDateTime(dateString: string): string {
+  if (ISO_TIMESTAMP_PATTERN.test(dateString)) {
+    return formatTimestampIST(dateString);
+  }
+
   try {
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+      return '—';
+    }
     return format(date, DISPLAY_DATETIME_FORMAT);
   } catch {
-    return dateString;
+    return '—';
   }
 }
 
@@ -80,6 +126,48 @@ export function daysUntil(dateString: string): number {
  */
 export function daysSince(dateString: string): number {
   return -daysUntil(dateString);
+}
+
+export type TimeOfDayGreeting = 'Morning' | 'Afternoon' | 'Evening';
+
+/**
+ * Time-of-day greeting label based on the user's local clock.
+ * 5am–11:59am → Morning; 12pm–4:59pm → Afternoon; 5pm–4:59am → Evening.
+ */
+export function getTimeOfDayGreeting(date = new Date()): TimeOfDayGreeting {
+  const hour = date.getHours();
+
+  if (hour >= 5 && hour < 12) {
+    return 'Morning';
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return 'Afternoon';
+  }
+
+  return 'Evening';
+}
+
+/**
+ * Full greeting phrase for coach briefs (e.g. "Good morning").
+ */
+export function getTimeOfDayGreetingPhrase(date = new Date()): string {
+  return `Good ${getTimeOfDayGreeting(date).toLowerCase()}`;
+}
+
+export interface PeakSeasonDashboardState {
+  isActive: boolean;
+  daysLeft: number;
+}
+
+/**
+ * Peak season countdown / active state for the dashboard.
+ */
+export function getPeakSeasonDashboardState(referenceDate = todayIST()): PeakSeasonDashboardState {
+  const isActive = referenceDate >= PEAK_SEASON_START;
+  const daysLeft = Math.max(daysUntil(PEAK_SEASON_START), 0);
+
+  return { isActive, daysLeft };
 }
 
 /**

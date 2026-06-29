@@ -1,28 +1,32 @@
 /**
  * TopNav component — top navigation bar with title, actions, and theme toggle.
- * Features a gradient progress bar as signature element.
+ * Features a gradient scroll progress bar as signature element.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
+import { useScrollProgressFill } from '@/hooks/useScrollProgressFill';
 import { getResolvedTheme, subscribeToSystemTheme, toggleTheme, type ResolvedTheme } from '@/lib/theme';
 
 export interface TopNavProps {
   title?: string;
-  progressPercentage?: number;
-  progressLabel?: string;
+  scrollRouteKey?: string;
+  onOpenMobileNav?: () => void;
   children?: ReactNode;
 }
 
 /**
- * Sticky top navigation with weekly progress bar and theme toggle.
+ * Sticky top navigation with page scroll progress bar and theme toggle.
  */
 export const TopNav = React.forwardRef<HTMLDivElement, TopNavProps>(
-  ({ title = 'Placement OS', progressPercentage = 0, progressLabel, children }, ref) => {
+  ({ title = 'Placement OS', scrollRouteKey = '', onOpenMobileNav, children }, ref) => {
+    const fillRef = useRef<HTMLDivElement>(null);
     const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
       typeof document !== 'undefined' ? getResolvedTheme() : 'light'
     );
+
+    useScrollProgressFill(fillRef, scrollRouteKey);
 
     useEffect(() => {
       setResolvedTheme(getResolvedTheme());
@@ -33,16 +37,27 @@ export const TopNav = React.forwardRef<HTMLDivElement, TopNavProps>(
       setResolvedTheme(toggleTheme());
     };
 
-    const clampedProgress = Math.min(Math.max(progressPercentage, 0), 100);
     const isDark = resolvedTheme === 'dark';
 
     return (
       <div
         ref={ref}
-        className="sticky top-0 z-30 bg-white dark:bg-[#13161A]"
+        className="sticky top-0 z-30 bg-white dark:bg-[#161A20]"
       >
         <div className="flex h-[var(--app-topbar-row-height)] items-center justify-between px-4 md:px-6">
-          <h1 className="font-display text-xl font-bold text-[#1A1614] dark:text-[#E8EDF2]">{title}</h1>
+          <div className="flex min-w-0 items-center gap-3">
+            {onOpenMobileNav && (
+              <button
+                type="button"
+                onClick={onOpenMobileNav}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[#7A736B] transition-colors duration-150 hover:bg-[#F3F0EB] dark:text-[#94A3B8] dark:hover:bg-[#1A1F26] lg:hidden"
+                aria-label="Open navigation menu"
+              >
+                <Menu size={18} />
+              </button>
+            )}
+            <h1 className="truncate font-display text-xl font-bold text-[#1A1614] dark:text-[#E2E8F0]">{title}</h1>
+          </div>
 
           <div className="flex items-center gap-3 md:gap-4">
             {children}
@@ -60,18 +75,19 @@ export const TopNav = React.forwardRef<HTMLDivElement, TopNavProps>(
         </div>
 
         <div
-          className="h-[var(--app-progress-height)] w-full bg-[#E8E3DC] dark:bg-[#232830]"
+          className="h-[var(--app-progress-height)] w-full bg-[#E8E3DC] dark:bg-[#232830]/40"
           role="progressbar"
-          aria-valuenow={clampedProgress}
+          aria-valuenow={0}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={progressLabel ?? 'Progress'}
-          title={progressLabel}
+          aria-label="Page scroll progress"
         >
           <div
-            className="h-full transition-all duration-500 motion-reduce:transition-none"
+            ref={fillRef}
+            className="h-full motion-reduce:transition-none"
             style={{
-              width: `${clampedProgress}%`,
+              width: '0%',
+              transition: 'width 0.1s ease-out',
               background: 'linear-gradient(to right, #E8622A, #C4841A, #5B5FEF)',
             }}
           />

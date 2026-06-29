@@ -3,10 +3,12 @@
  * Reads topic and problem data from Supabase and builds dashboard-ready summaries.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseISO } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { calculateLongestStreak, calculateStreak, daysSince, todayIST } from '@/utils';
+import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
+import { runOptimisticMutation } from '@/utils/optimisticMutation';
 import type { DSAProblem } from '@/types';
 import type { DSAProblemSummary, DSATopicSummary, DSAStats, DSAViewData } from '@/types/dsa';
 
@@ -179,18 +181,21 @@ export function useDSAData(userId: string | null): UseDSADataResult {
   const [error, setError] = useState<string | null>(null);
   const [topics, setTopics] = useState<DSATopicRow[]>([]);
   const [problems, setProblems] = useState<DSAProblemRow[]>([]);
-  const [reloadToken, setReloadToken] = useState(0);
+  const hydratedRef = useRef(false);
 
-  const loadData = useCallback(async (): Promise<void> => {
+  const loadData = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
       setTopics([]);
       setProblems([]);
       setError(null);
       setLoading(false);
+      resetHydrated(hydratedRef);
       return;
     }
 
-    setLoading(true);
+    if (shouldShowInitialLoading(hydratedRef, options?.silent)) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -210,25 +215,31 @@ export function useDSAData(userId: string | null): UseDSADataResult {
       if (topicsResult.error) throw topicsResult.error;
       if (problemsResult.error) throw problemsResult.error;
 
-      setTopics((topicsResult.data ?? []) as DSATopicRow[]);
-      setProblems((problemsResult.data ?? []) as DSAProblemRow[]);
+      const nextTopics = (topicsResult.data ?? []) as DSATopicRow[];
+      const nextProblems = (problemsResult.data ?? []) as DSAProblemRow[];
+      setTopics(nextTopics);
+      setProblems(nextProblems);
     } catch (loadError) {
       console.error('Failed to load DSA data', loadError);
       setError(loadError instanceof Error ? loadError.message : 'Failed to load DSA data');
-      setTopics([]);
-      setProblems([]);
+      if (!hydratedRef.current) {
+        setTopics([]);
+        setProblems([]);
+      }
     } finally {
+      markHydrated(hydratedRef);
       setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    resetHydrated(hydratedRef);
     loadData().catch((loadError: unknown) => {
       console.error('Unexpected DSA load error', loadError);
       setError('Unexpected error while loading DSA data');
       setLoading(false);
     });
-  }, [loadData, reloadToken]);
+  }, [loadData]);
 
   const viewData = useMemo<DSAViewData | null>(() => {
     if (!userId) {
@@ -251,90 +262,82 @@ export function useDSAData(userId: string | null): UseDSADataResult {
     };
   }, [problems, topics, userId]);
 
-  const toggleSolved = useCallback(async (problemId: string): Promise<void> => {
-    const target = problems.find((problem) => problem.id === problemId);
-    if (!target) return;
+  const toggleSolved = useCallback(
+    async (problemId: string): Promise<void> => {
+      const target = problems.find((problem) => problem.id === problemId);
+      if (!target) return;
 
-    const nextSolved = !target.solved;
-    const nextSolvedDate = nextSolved ? todayIST() : null;
-
-    const { error: updateError } = await supabase
-      .from('dsa_problems')
-      .update({
-        solved: nextSolved,
-        solved_date: nextSolvedDate,
-      })
-      .eq('id', problemId);
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    setProblems((current) =>
-      current.map((problem) =>
+      const previousProblems = problems;
+      const nextSolved = !target.solved;
+      const nextSolvedDate = nextSolved ? todayIST() : null;
+      const optimisticProblems = problems.map((problem) =>
         problem.id === problemId
-          ? {
-              ...problem,
-              solved: nextSolved,
-              solved_date: nextSolvedDate,
-            }
+          ? { ...problem, solved: nextSolved, solved_date: nextSolvedDate }
           : problem
-      )
-    );
-    setReloadToken((value) => value + 1);
-  }, [problems]);
+      );
 
-  const toggleRevision = useCallback(async (problemId: string): Promise<void> => {
-    const target = problems.find((problem) => problem.id === problemId);
-    if (!target) return;
+      await runOptimisticMutation({
+        apply: () => setProblems(optimisticProblems),
+        revert: () => setProblems(previousProblems),
+        persist: async () => {
+          const { error: updateError } = await supabase
+            .from('dsa_problems')
+            .update({ solved: nextSolved, solved_date: nextSolvedDate })
+            .eq('id', problemId);
+          if (updateError) throw updateError;
+        },
+        errorMessage: 'Could not update problem status.',
+      });
+    },
+    [problems]
+  );
 
-    const nextFlagged = !target.flagged_for_revision;
+  const toggleRevision = useCallback(
+    async (problemId: string): Promise<void> => {
+      const target = problems.find((problem) => problem.id === problemId);
+      if (!target) return;
 
-    const { error: updateError } = await supabase
-      .from('dsa_problems')
-      .update({
-        flagged_for_revision: nextFlagged,
-      })
-      .eq('id', problemId);
+      const previousProblems = problems;
+      const nextFlagged = !target.flagged_for_revision;
+      const optimisticProblems = problems.map((problem) =>
+        problem.id === problemId ? { ...problem, flagged_for_revision: nextFlagged } : problem
+      );
 
-    if (updateError) {
-      throw updateError;
-    }
+      await runOptimisticMutation({
+        apply: () => setProblems(optimisticProblems),
+        revert: () => setProblems(previousProblems),
+        persist: async () => {
+          const { error: updateError } = await supabase
+            .from('dsa_problems')
+            .update({ flagged_for_revision: nextFlagged })
+            .eq('id', problemId);
+          if (updateError) throw updateError;
+        },
+        errorMessage: 'Could not update revision flag.',
+      });
+    },
+    [problems]
+  );
 
-    setProblems((current) =>
-      current.map((problem) =>
-        problem.id === problemId
-          ? {
-              ...problem,
-              flagged_for_revision: nextFlagged,
-            }
-          : problem
-      )
-    );
-    setReloadToken((value) => value + 1);
-  }, [problems]);
+  const updateNotes = useCallback(
+    async (problemId: string, notes: string): Promise<void> => {
+      const previousProblems = problems;
+      const optimisticProblems = problems.map((problem) =>
+        problem.id === problemId ? { ...problem, notes } : problem
+      );
 
-  const updateNotes = useCallback(async (problemId: string, notes: string): Promise<void> => {
-    const { error: updateError } = await supabase
-      .from('dsa_problems')
-      .update({ notes })
-      .eq('id', problemId);
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    setProblems((current) =>
-      current.map((problem) =>
-        problem.id === problemId
-          ? {
-              ...problem,
-              notes,
-            }
-          : problem
-      )
-    );
-  }, []);
+      await runOptimisticMutation({
+        apply: () => setProblems(optimisticProblems),
+        revert: () => setProblems(previousProblems),
+        persist: async () => {
+          const { error: updateError } = await supabase.from('dsa_problems').update({ notes }).eq('id', problemId);
+          if (updateError) throw updateError;
+        },
+        errorMessage: 'Could not save notes.',
+      });
+    },
+    [problems]
+  );
 
   const addCustomProblem = useCallback(
     async (input: AddCustomProblemInput): Promise<void> => {
@@ -347,32 +350,54 @@ export function useDSAData(userId: string | null): UseDSADataResult {
         throw new Error('Problem name is required.');
       }
 
-      const { data: inserted, error: insertError } = await supabase
-        .from('dsa_problems')
-        .insert({
-          user_id: userId,
-          topic_id: input.topicId,
-          name: trimmedName,
-          difficulty: input.difficulty,
-          leetcode_url: input.leetcodeUrl?.trim() || null,
-          solved: false,
-          flagged_for_revision: false,
-          notes: '',
-        })
-        .select('id, topic_id, name, difficulty, leetcode_url, solved, solved_date, flagged_for_revision, notes, updated_at')
-        .single();
+      const tempId = crypto.randomUUID();
+      const optimisticRow: DSAProblemRow = {
+        id: tempId,
+        topic_id: input.topicId,
+        name: trimmedName,
+        difficulty: input.difficulty,
+        leetcode_url: input.leetcodeUrl?.trim() || null,
+        solved: false,
+        solved_date: null,
+        flagged_for_revision: false,
+        notes: '',
+        updated_at: new Date().toISOString(),
+      };
+      const previousProblems = problems;
 
-      if (insertError) {
-        throw insertError;
-      }
+      await runOptimisticMutation({
+        apply: () => {
+          setProblems([optimisticRow, ...problems]);
+        },
+        revert: () => setProblems(previousProblems),
+        persist: async () => {
+          const { data: inserted, error: insertError } = await supabase
+            .from('dsa_problems')
+            .insert({
+              user_id: userId,
+              topic_id: input.topicId,
+              name: trimmedName,
+              difficulty: input.difficulty,
+              leetcode_url: input.leetcodeUrl?.trim() || null,
+              solved: false,
+              flagged_for_revision: false,
+              notes: '',
+            })
+            .select('id, topic_id, name, difficulty, leetcode_url, solved, solved_date, flagged_for_revision, notes, updated_at')
+            .single();
 
-      if (inserted) {
-        setProblems((current) => [inserted as DSAProblemRow, ...current]);
-      }
+          if (insertError) throw insertError;
 
-      setReloadToken((value) => value + 1);
+          if (inserted) {
+            setProblems((current) =>
+              current.map((problem) => (problem.id === tempId ? (inserted as DSAProblemRow) : problem))
+            );
+          }
+        },
+        errorMessage: 'Could not add problem.',
+      });
     },
-    [userId]
+    [problems, userId]
   );
 
   return {

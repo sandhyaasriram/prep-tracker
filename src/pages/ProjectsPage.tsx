@@ -51,7 +51,7 @@ export function ProjectsPage({ user }: ProjectsPageProps) {
     exportToCSV(rows, generateCSVFilename('projects'));
   };
 
-  if (loading) {
+  if (loading && !data) {
     return <p className="text-sm text-[#7A736B] dark:text-[#6B7280]">Loading projects...</p>;
   }
 
@@ -71,7 +71,7 @@ export function ProjectsPage({ user }: ProjectsPageProps) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">Projects</h1>
+          <h1 className="font-display text-3xl text-[#1A1614] dark:text-[#E8EDF2]">What you build is what you become.</h1>
           <p className="mt-1 text-sm text-[#7A736B] dark:text-[#6B7280]">
             Portfolio projects, deployment links, and resume-ready checklists.
           </p>

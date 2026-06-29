@@ -2,10 +2,12 @@
  * Journal data hook.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSupabaseError } from '@/utils/errors';
 import { todayIST } from '@/utils';
+import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
+import { runOptimisticMutation } from '@/utils/optimisticMutation';
 import type { JournalEntry } from '@/types';
 import type { JournalViewData, UpsertJournalEntryInput } from '@/types/journal';
 
@@ -15,7 +17,7 @@ interface UseJournalDataResult {
   error: string | null;
   upsertEntry: (input: UpsertJournalEntryInput) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 /**
@@ -25,15 +27,19 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hydratedRef = useRef(false);
 
-  const fetchData = useCallback(async (): Promise<void> => {
+  const fetchData = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
       setEntries([]);
       setLoading(false);
+      resetHydrated(hydratedRef);
       return;
     }
 
-    setLoading(true);
+    if (shouldShowInitialLoading(hydratedRef, options?.silent)) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -47,16 +53,20 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
         throw fetchError;
       }
 
-      setEntries((data ?? []) as JournalEntry[]);
-    } catch (fetchError) {
+      const next = (data ?? []) as JournalEntry[];
+      setEntries(next);    } catch (fetchError) {
       setError(formatSupabaseError(fetchError));
-      setEntries([]);
+      if (!hydratedRef.current) {
+        setEntries([]);
+      }
     } finally {
+      markHydrated(hydratedRef);
       setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    resetHydrated(hydratedRef);
     void fetchData();
   }, [fetchData]);
 
@@ -73,51 +83,91 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
 
   const upsertEntry = useCallback(
     async (input: UpsertJournalEntryInput): Promise<void> => {
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
+      if (!userId) throw new Error('Not authenticated');
 
       const existing = entries.find((entry) => entry.date === input.date);
+      const previous = entries;
 
       if (existing) {
-        const { error: updateError } = await supabase
-          .from('journal_entries')
-          .update({ content_markdown: input.contentMarkdown })
-          .eq('id', existing.id);
+        const optimistic = entries.map((entry) =>
+          entry.id === existing.id ? { ...entry, content_markdown: input.contentMarkdown } : entry
+        );
 
-        if (updateError) {
-          throw new Error(formatSupabaseError(updateError));
-        }
-      } else {
-        const { error: insertError } = await supabase.from('journal_entries').insert([
-          {
-            user_id: userId,
-            date: input.date,
-            content_markdown: input.contentMarkdown,
+        await runOptimisticMutation({
+          apply: () => {
+            setEntries(optimistic);          },
+          revert: () => {
+            setEntries(previous);          },
+          persist: async () => {
+            const { error: updateError } = await supabase
+              .from('journal_entries')
+              .update({ content_markdown: input.contentMarkdown })
+              .eq('id', existing.id);
+            if (updateError) throw updateError;
           },
-        ]);
-
-        if (insertError) {
-          throw new Error(formatSupabaseError(insertError));
-        }
+          errorMessage: 'Could not save journal entry.',
+        });
+        return;
       }
 
-      await fetchData();
+      const tempId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const optimisticEntry: JournalEntry = {
+        id: tempId,
+        user_id: userId,
+        date: input.date,
+        content_markdown: input.contentMarkdown,
+        created_at: now,
+        updated_at: now,
+      };
+      const optimistic = [optimisticEntry, ...entries];
+
+      await runOptimisticMutation({
+        apply: () => {
+          setEntries(optimistic);        },
+        revert: () => {
+          setEntries(previous);        },
+        persist: async () => {
+          const { data: inserted, error: insertError } = await supabase
+            .from('journal_entries')
+            .insert([
+              {
+                user_id: userId,
+                date: input.date,
+                content_markdown: input.contentMarkdown,
+              },
+            ])
+            .select('*')
+            .single();
+          if (insertError) throw insertError;
+          setEntries((current) => {
+            const next = current.map((entry) => (entry.id === tempId ? (inserted as JournalEntry) : entry));            return next;
+          });
+        },
+        errorMessage: 'Could not save journal entry.',
+      });
     },
-    [userId, entries, fetchData]
+    [userId, entries]
   );
 
   const deleteEntry = useCallback(
     async (id: string): Promise<void> => {
-      const { error: deleteError } = await supabase.from('journal_entries').delete().eq('id', id);
+      const previous = entries;
+      const optimistic = entries.filter((entry) => entry.id !== id);
 
-      if (deleteError) {
-        throw new Error(formatSupabaseError(deleteError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => {
+          setEntries(optimistic);        },
+        revert: () => {
+          setEntries(previous);        },
+        persist: async () => {
+          const { error: deleteError } = await supabase.from('journal_entries').delete().eq('id', id);
+          if (deleteError) throw deleteError;
+        },
+        errorMessage: 'Could not delete journal entry.',
+      });
     },
-    [fetchData]
+    [entries]
   );
 
   return {

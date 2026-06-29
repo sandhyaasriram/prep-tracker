@@ -5,9 +5,9 @@
 import { parseISO } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
 import { supabase } from '@/lib/supabase';
-import { WEEKLY_GOALS_TARGETS } from '@/constants';
+import { PEAK_SEASON_START, WEEKLY_GOALS_TARGETS } from '@/constants';
 import { calculateStreak, daysSince, daysUntil, todayIST } from '@/utils';
-import type { CoachContext } from '@/types/coach';
+import type { CoachApplicationStage, CoachContext, CoachWeeklyGoal } from '@/types/coach';
 
 interface DSAProblemRow {
   name: string;
@@ -25,6 +25,7 @@ interface DSATopicRow {
 interface ApplicationRow {
   company: string;
   role: string;
+  stage: string;
   next_deadline: string | null;
 }
 
@@ -43,15 +44,87 @@ interface OALogRow {
   topics: string[];
 }
 
+interface WeeklyGoalRow {
+  category: string;
+  goal_text: string;
+  completed: boolean;
+  start_date: string;
+  end_date: string;
+}
+
+interface ProjectRow {
+  id: string;
+  name: string;
+  type: string;
+}
+
+interface ChecklistRow {
+  project_id: string;
+  item: string;
+  completed: boolean;
+}
+
 interface TopicRevisionSummary {
   topicName: string;
   lastSolvedDate: string | null;
+  solvedCount: number;
 }
 
 function getWeekStart(today: string): Date {
   const date = parseISO(today);
   date.setDate(date.getDate() - 6);
   return date;
+}
+
+function buildApplicationsByStage(applications: ApplicationRow[]): CoachApplicationStage[] {
+  const stageMap = new Map<string, { count: number; companies: string[] }>();
+
+  for (const application of applications) {
+    const existing = stageMap.get(application.stage) ?? { count: 0, companies: [] };
+    existing.count += 1;
+    if (!existing.companies.includes(application.company)) {
+      existing.companies.push(application.company);
+    }
+    stageMap.set(application.stage, existing);
+  }
+
+  return [...stageMap.entries()].map(([stage, data]) => ({
+    stage,
+    count: data.count,
+    companies: data.companies.slice(0, 5),
+  }));
+}
+
+function buildWeeklyGoalsContext(goals: WeeklyGoalRow[], today: string): {
+  weeklyGoals: CoachWeeklyGoal[];
+  weeklyGoalsCompleted: number;
+  weeklyGoalsTotal: number;
+} {
+  const currentGoals = goals.filter((goal) => goal.start_date <= today && goal.end_date >= today);
+  const weeklyGoals = currentGoals.map((goal) => ({
+    category: goal.category,
+    goalText: goal.goal_text,
+    completed: goal.completed,
+  }));
+
+  return {
+    weeklyGoals,
+    weeklyGoalsCompleted: currentGoals.filter((goal) => goal.completed).length,
+    weeklyGoalsTotal: currentGoals.length,
+  };
+}
+
+function buildProjectGaps(projects: ProjectRow[], checklist: ChecklistRow[]): string[] {
+  const existingIds = new Set(projects.filter((project) => project.type === 'existing').map((project) => project.id));
+  const projectNameById = new Map(projects.map((project) => [project.id, project.name]));
+
+  return checklist
+    .filter((item) => existingIds.has(item.project_id) && !item.completed)
+    .slice(0, 5)
+    .map((item) => {
+      const projectName = projectNameById.get(item.project_id) ?? 'Project';
+      return `${projectName}: ${item.item}`;
+    });
 }
 
 /**
@@ -62,15 +135,27 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const weekStart = getWeekStart(today);
   const firstName = profileSeed.name.split(' ')[0] ?? profileSeed.name;
 
-  const [problemsResult, topicsResult, applicationsResult, certificationsResult, mocksResult, oaResult] =
-    await Promise.all([
-      supabase.from('dsa_problems').select('name, solved, solved_date, flagged_for_revision, updated_at, topic_id').eq('user_id', userId),
-      supabase.from('dsa_topics').select('id, name').eq('user_id', userId),
-      supabase.from('applications').select('company, role, next_deadline').eq('user_id', userId),
-      supabase.from('certifications').select('name, status, progress, target_date').eq('user_id', userId),
-      supabase.from('mock_interviews').select('date').eq('user_id', userId),
-      supabase.from('oa_log').select('topics').eq('user_id', userId),
-    ]);
+  const [
+    problemsResult,
+    topicsResult,
+    applicationsResult,
+    certificationsResult,
+    mocksResult,
+    oaResult,
+    weeklyGoalsResult,
+    projectsResult,
+    checklistResult,
+  ] = await Promise.all([
+    supabase.from('dsa_problems').select('name, solved, solved_date, flagged_for_revision, updated_at, topic_id').eq('user_id', userId),
+    supabase.from('dsa_topics').select('id, name').eq('user_id', userId),
+    supabase.from('applications').select('company, role, stage, next_deadline').eq('user_id', userId),
+    supabase.from('certifications').select('name, status, progress, target_date').eq('user_id', userId),
+    supabase.from('mock_interviews').select('date').eq('user_id', userId),
+    supabase.from('oa_log').select('topics').eq('user_id', userId),
+    supabase.from('weekly_goals').select('category, goal_text, completed, start_date, end_date').eq('user_id', userId),
+    supabase.from('projects').select('id, name, type').eq('user_id', userId),
+    supabase.from('project_checklist').select('project_id, item, completed'),
+  ]);
 
   const problems = (problemsResult.data ?? []) as Array<DSAProblemRow & { topic_id: string }>;
   const topics = (topicsResult.data ?? []) as DSATopicRow[];
@@ -78,6 +163,9 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const certifications = (certificationsResult.data ?? []) as CertificationRow[];
   const mocks = (mocksResult.data ?? []) as MockRow[];
   const oaLogs = (oaResult.data ?? []) as OALogRow[];
+  const weeklyGoals = (weeklyGoalsResult.data ?? []) as WeeklyGoalRow[];
+  const projects = (projectsResult.data ?? []) as ProjectRow[];
+  const checklist = (checklistResult.data ?? []) as ChecklistRow[];
 
   const dsaSolvedThisWeek = problems.filter((problem) => {
     if (!problem.solved || !problem.solved_date) return false;
@@ -91,13 +179,14 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   const topicRevisionMap = new Map<string, TopicRevisionSummary>();
 
   for (const topic of topics) {
-    topicRevisionMap.set(topic.id, { topicName: topic.name, lastSolvedDate: null });
+    topicRevisionMap.set(topic.id, { topicName: topic.name, lastSolvedDate: null, solvedCount: 0 });
   }
 
   for (const problem of problems) {
     if (!problem.solved) continue;
     const summary = topicRevisionMap.get(problem.topic_id);
     if (!summary) continue;
+    summary.solvedCount += 1;
     const solvedDate = problem.solved_date;
     if (!solvedDate) continue;
     if (!summary.lastSolvedDate || solvedDate > summary.lastSolvedDate) {
@@ -105,13 +194,17 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
     }
   }
 
+  const untouchedDsaTopics = [...topicRevisionMap.values()]
+    .filter((summary) => summary.solvedCount === 0)
+    .map((summary) => summary.topicName)
+    .slice(0, 5);
+
   const topicsDueForRevision = [...topicRevisionMap.values()]
     .filter((summary) => {
       if (!summary.lastSolvedDate) return false;
       return daysSince(summary.lastSolvedDate) >= 7;
     })
-    .map((summary) => summary.topicName)
-    .slice(0, 5);
+    .map((summary) => summary.topicName);
 
   const flaggedTopics = problems
     .filter((problem) => problem.flagged_for_revision)
@@ -171,93 +264,32 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
     return mockDate >= weekStart && mockDate <= parseISO(today);
   }).length;
 
+  const { weeklyGoals: currentWeeklyGoals, weeklyGoalsCompleted, weeklyGoalsTotal } = buildWeeklyGoalsContext(
+    weeklyGoals,
+    today
+  );
+
+  const peakSeasonDaysLeft = Math.max(daysUntil(PEAK_SEASON_START), 0);
+  const daysUntilPeakSeason = today >= PEAK_SEASON_START ? 0 : peakSeasonDaysLeft;
+
   return {
     firstName,
     dsaSolvedThisWeek,
     dsaWeeklyTarget: WEEKLY_GOALS_TARGETS.DSA_PROBLEMS,
     currentStreak,
     topicsDueForRevision: uniqueRevisionTopics,
+    untouchedDsaTopics,
     upcomingDeadlines,
+    applicationsByStage: buildApplicationsByStage(applications),
+    weeklyGoals: currentWeeklyGoals,
+    weeklyGoalsCompleted,
+    weeklyGoalsTotal,
+    projectGaps: buildProjectGaps(projects, checklist),
     topOaTopics,
     certificationsBehind,
     mocksThisWeek,
+    daysUntilPeakSeason,
   };
 }
 
-/**
- * Rules-based brief when Gemini is unavailable or no API key is set.
- */
-export function generateCoachFallbackBrief(context: CoachContext): string {
-  const tasks: string[] = [];
-
-  if (context.dsaSolvedThisWeek < context.dsaWeeklyTarget) {
-    const remaining = context.dsaWeeklyTarget - context.dsaSolvedThisWeek;
-    tasks.push(`Solve ${Math.min(remaining, 4)} DSA problems — ${context.dsaSolvedThisWeek}/${context.dsaWeeklyTarget} done this week (${context.currentStreak}d streak).`);
-  }
-
-  if (context.topicsDueForRevision.length > 0) {
-    tasks.push(`Revise ${context.topicsDueForRevision[0]} — flagged or untouched for 7+ days.`);
-  }
-
-  if (context.upcomingDeadlines.length > 0) {
-    const nearest = context.upcomingDeadlines[0];
-    tasks.push(`Follow up on ${nearest.title} — ${nearest.daysUntil} day${nearest.daysUntil === 1 ? '' : 's'} until deadline.`);
-  }
-
-  if (context.mocksThisWeek === 0) {
-    tasks.push('Schedule one mock interview or OA-style timed set — none logged this week.');
-  }
-
-  if (context.certificationsBehind.length > 0) {
-    const cert = context.certificationsBehind[0];
-    tasks.push(`Push ${cert.name} to ${Math.min(cert.progress + 10, 100)}% — currently at ${cert.progress}%.`);
-  }
-
-  while (tasks.length < 4) {
-    const filler =
-      tasks.length === 0
-        ? 'Review application pipeline and update stages for any stale processes.'
-        : "Log today's progress in the journal before end of day.";
-    if (!tasks.includes(filler)) {
-      tasks.push(filler);
-    } else {
-      break;
-    }
-  }
-
-  const focusMinutes = Math.min(120 + tasks.length * 45, 300);
-  const focusHours = Math.floor(focusMinutes / 60);
-  const focusMins = focusMinutes % 60;
-
-  const whyParts: string[] = [];
-  if (context.topOaTopics.length > 0) {
-    whyParts.push(`OA history shows ${context.topOaTopics.slice(0, 2).join(' and ')} appearing often — closing gaps there has high ROI.`);
-  }
-  if (context.dsaSolvedThisWeek < context.dsaWeeklyTarget) {
-    whyParts.push(`You are behind the weekly DSA target; catching up now protects your streak and revision rhythm.`);
-  }
-  if (whyParts.length === 0) {
-    whyParts.push('Maintaining momentum across DSA, applications, and certifications compounds through peak season.');
-  }
-
-  let watchOut = 'Keep an eye on upcoming deadlines — check every morning.';
-  if (context.certificationsBehind.length > 0) {
-    const cert = context.certificationsBehind[0];
-    if (cert.daysUntilTarget !== null && cert.daysUntilTarget <= 14) {
-      watchOut = `${cert.name} is ${cert.progress}% complete with ${cert.daysUntilTarget} days to target — one module today keeps it recoverable.`;
-    }
-  }
-
-  return `Good morning, ${context.firstName}.
-
-Today's highest ROI tasks:
-${tasks.slice(0, 4).map((task, index) => `${index + 1}. ${task}`).join('\n')}
-
-Estimated focus time: ${focusHours}h ${focusMins}m
-
-Why these:
-${whyParts.join(' ')}
-
-Watch out for:
-${watchOut}`;
-}
+export { generateCoachFallbackBrief } from '@/utils/coachPrompt';

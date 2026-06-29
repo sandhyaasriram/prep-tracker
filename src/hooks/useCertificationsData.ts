@@ -2,9 +2,11 @@
  * Certifications data hook.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSupabaseError } from '@/utils/errors';
+import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
+import { runOptimisticMutation } from '@/utils/optimisticMutation';
 import type { Certification } from '@/types';
 import type {
   AddCertificationInput,
@@ -19,7 +21,7 @@ interface UseCertificationsDataResult {
   addCertification: (input: AddCertificationInput) => Promise<void>;
   updateCertification: (id: string, input: UpdateCertificationInput) => Promise<void>;
   deleteCertification: (id: string) => Promise<void>;
-  refresh: () => Promise<void>;
+  refresh: (options?: { silent?: boolean }) => Promise<void>;
 }
 
 function buildStats(certifications: Certification[]): CertificationsViewData['stats'] {
@@ -48,15 +50,19 @@ export function useCertificationsData(userId: string | null): UseCertificationsD
   const [certifications, setCertifications] = useState<Certification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hydratedRef = useRef(false);
 
-  const fetchData = useCallback(async (): Promise<void> => {
+  const fetchData = useCallback(async (options?: { silent?: boolean }): Promise<void> => {
     if (!userId) {
       setCertifications([]);
       setLoading(false);
+      resetHydrated(hydratedRef);
       return;
     }
 
-    setLoading(true);
+    if (shouldShowInitialLoading(hydratedRef, options?.silent)) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -71,16 +77,20 @@ export function useCertificationsData(userId: string | null): UseCertificationsD
         throw fetchError;
       }
 
-      setCertifications((data ?? []) as Certification[]);
-    } catch (fetchError) {
+      const next = (data ?? []) as Certification[];
+      setCertifications(next);    } catch (fetchError) {
       setError(formatSupabaseError(fetchError));
-      setCertifications([]);
+      if (!hydratedRef.current) {
+        setCertifications([]);
+      }
     } finally {
+      markHydrated(hydratedRef);
       setLoading(false);
     }
   }, [userId]);
 
   useEffect(() => {
+    resetHydrated(hydratedRef);
     void fetchData();
   }, [fetchData]);
 
@@ -98,11 +108,12 @@ export function useCertificationsData(userId: string | null): UseCertificationsD
 
   const addCertification = useCallback(
     async (input: AddCertificationInput): Promise<void> => {
-      if (!userId) {
-        throw new Error('Not authenticated');
-      }
+      if (!userId) throw new Error('Not authenticated');
 
-      const payload = {
+      const tempId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const optimistic: Certification = {
+        id: tempId,
         user_id: userId,
         name: input.name.trim(),
         provider: input.provider.trim(),
@@ -111,57 +122,113 @@ export function useCertificationsData(userId: string | null): UseCertificationsD
         progress: input.progress ?? (input.status === 'Completed' ? 100 : 0),
         cert_url: input.certUrl?.trim() ?? '',
         notes: input.notes?.trim() ?? '',
+        created_at: now,
+        updated_at: now,
       };
+      const previous = certifications;
 
-      const { error: insertError } = await supabase.from('certifications').insert([payload]);
-
-      if (insertError) {
-        throw new Error(formatSupabaseError(insertError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => {
+          const next = [...certifications, optimistic];
+          setCertifications(next);        },
+        revert: () => {
+          setCertifications(previous);        },
+        persist: async () => {
+          const { data: inserted, error: insertError } = await supabase
+            .from('certifications')
+            .insert([
+              {
+                user_id: userId,
+                name: optimistic.name,
+                provider: optimistic.provider,
+                status: optimistic.status,
+                target_date: optimistic.target_date,
+                progress: optimistic.progress,
+                cert_url: optimistic.cert_url,
+                notes: optimistic.notes,
+              },
+            ])
+            .select('*')
+            .single();
+          if (insertError) throw insertError;
+          setCertifications((current) => {
+            const next = current.map((cert) => (cert.id === tempId ? (inserted as Certification) : cert));            return next;
+          });
+        },
+        errorMessage: 'Could not add certification.',
+      });
     },
-    [userId, fetchData]
+    [certifications, userId]
   );
 
   const updateCertification = useCallback(
     async (id: string, input: UpdateCertificationInput): Promise<void> => {
-      const payload: Record<string, unknown> = {};
+      const previous = certifications;
+      const optimistic = certifications.map((cert) => {
+        if (cert.id !== id) return cert;
 
-      if (input.name !== undefined) payload.name = input.name.trim();
-      if (input.provider !== undefined) payload.provider = input.provider.trim();
-      if (input.status !== undefined) payload.status = input.status;
-      if (input.targetDate !== undefined) payload.target_date = input.targetDate;
-      if (input.progress !== undefined) payload.progress = input.progress;
-      if (input.certUrl !== undefined) payload.cert_url = input.certUrl.trim();
-      if (input.notes !== undefined) payload.notes = input.notes.trim();
+        const nextStatus = input.status !== undefined ? input.status : cert.status;
+        let nextProgress = input.progress !== undefined ? input.progress : cert.progress;
+        if (nextStatus === 'Completed' && input.progress === undefined) {
+          nextProgress = 100;
+        }
 
-      if (input.status === 'Completed' && input.progress === undefined) {
-        payload.progress = 100;
-      }
+        return {
+          ...cert,
+          name: input.name !== undefined ? input.name.trim() : cert.name,
+          provider: input.provider !== undefined ? input.provider.trim() : cert.provider,
+          status: nextStatus,
+          target_date: input.targetDate !== undefined ? input.targetDate : cert.target_date,
+          progress: nextProgress,
+          cert_url: input.certUrl !== undefined ? input.certUrl.trim() : cert.cert_url,
+          notes: input.notes !== undefined ? input.notes.trim() : cert.notes,
+        };
+      });
 
-      const { error: updateError } = await supabase.from('certifications').update(payload).eq('id', id);
-
-      if (updateError) {
-        throw new Error(formatSupabaseError(updateError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => {
+          setCertifications(optimistic);        },
+        revert: () => {
+          setCertifications(previous);        },
+        persist: async () => {
+          const payload: Record<string, unknown> = {};
+          if (input.name !== undefined) payload.name = input.name.trim();
+          if (input.provider !== undefined) payload.provider = input.provider.trim();
+          if (input.status !== undefined) payload.status = input.status;
+          if (input.targetDate !== undefined) payload.target_date = input.targetDate;
+          if (input.progress !== undefined) payload.progress = input.progress;
+          if (input.certUrl !== undefined) payload.cert_url = input.certUrl.trim();
+          if (input.notes !== undefined) payload.notes = input.notes.trim();
+          if (input.status === 'Completed' && input.progress === undefined) {
+            payload.progress = 100;
+          }
+          const { error: updateError } = await supabase.from('certifications').update(payload).eq('id', id);
+          if (updateError) throw updateError;
+        },
+        errorMessage: 'Could not update certification.',
+      });
     },
-    [fetchData]
+    [certifications]
   );
 
   const deleteCertification = useCallback(
     async (id: string): Promise<void> => {
-      const { error: deleteError } = await supabase.from('certifications').delete().eq('id', id);
+      const previous = certifications;
+      const optimistic = certifications.filter((cert) => cert.id !== id);
 
-      if (deleteError) {
-        throw new Error(formatSupabaseError(deleteError));
-      }
-
-      await fetchData();
+      await runOptimisticMutation({
+        apply: () => {
+          setCertifications(optimistic);        },
+        revert: () => {
+          setCertifications(previous);        },
+        persist: async () => {
+          const { error: deleteError } = await supabase.from('certifications').delete().eq('id', id);
+          if (deleteError) throw deleteError;
+        },
+        errorMessage: 'Could not delete certification.',
+      });
     },
-    [fetchData]
+    [certifications]
   );
 
   return {

@@ -57,7 +57,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
     return (
       <span
         ref={ref}
-        className={`inline-block px-2 py-1 rounded-full text-xs font-medium transition-colors duration-150 ${className}`}
+        className={`badge-tonal inline-block px-2 py-1 rounded-full text-xs font-medium transition-colors duration-150 ${className}`}
         style={{ backgroundColor: bgColor, color: textColor }}
       >
         {children}
