@@ -17,3 +17,5 @@ export type { InputProps } from './Input';
 
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
+
+export { HorizontalScrollArea } from './HorizontalScrollArea';

@@ -90,6 +90,17 @@ export const CS_FUNDAMENTAL_STATUS = {
   STRONG: 'Strong',
 } as const;
 
+export const TIMELINE_CATEGORIES = ['DSA', 'Cert', 'Application', 'Personal'] as const;
+
+export const TIMELINE_CATEGORY_COLORS: Record<(typeof TIMELINE_CATEGORIES)[number], string> = {
+  DSA: '#5B5FEF',
+  Cert: '#C4841A',
+  Application: '#E8622A',
+  Personal: '#7A736B',
+};
+
+export const TIMELINE_COLOR_LABELS = ['Indigo', 'Amber', 'Terracotta', 'Warm Grey'] as const;
+
 export const THEME_OPTIONS = {
   LIGHT: 'light',
   DARK: 'dark',

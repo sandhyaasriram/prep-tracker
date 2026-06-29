@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { AppNavRoute } from '@/components/layout/MainLayout';
 import { calculateSeasonProgress, calculateWeeklyProgress } from '@/utils/progress';
+import { buildWeekDefinitions, calculateReviewCompletion, getCurrentWeekNumber } from '@/utils/weekUtils';
 
 export interface NavProgress {
   progress: number;
@@ -173,6 +174,44 @@ export function useNavProgress(userId: string | null, route: AppNavRoute): NavPr
         setNavProgress({
           progress,
           label: 'Placement season elapsed',
+        });
+        return;
+      }
+
+      if (route === 'Weekly Review') {
+        const [goalsResult, reviewsResult] = await Promise.all([
+          supabase.from('weekly_goals').select('week_number, start_date, end_date').eq('user_id', userId),
+          supabase.from('weekly_reviews').select('*').eq('user_id', userId),
+        ]);
+
+        if (goalsResult.error) throw goalsResult.error;
+        if (reviewsResult.error) throw reviewsResult.error;
+
+        const weeks = buildWeekDefinitions((goalsResult.data ?? []) as Array<{ week_number: number; start_date: string; end_date: string }>);
+        const currentWeek = getCurrentWeekNumber(weeks);
+        const currentReview = ((reviewsResult.data ?? []) as Array<{
+          week_number: number;
+          biggest_win: string;
+          bottleneck: string;
+          lessons: string;
+          focus_next: string;
+          hours_worked: number;
+          mood_rating: number | null;
+          free_notes: string;
+        }>).find((review) => review.week_number === currentWeek);
+
+        const progress = currentReview ? calculateReviewCompletion(currentReview) : 0;
+        setNavProgress({
+          progress,
+          label: `Week ${currentWeek} review: ${progress}% complete`,
+        });
+        return;
+      }
+
+      if (route === 'Settings') {
+        setNavProgress({
+          progress: 100,
+          label: 'Workspace settings',
         });
         return;
       }

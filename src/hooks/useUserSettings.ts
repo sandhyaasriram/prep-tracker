@@ -3,15 +3,25 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { applyTheme, getResolvedTheme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { formatSupabaseError } from '@/utils/errors';
+import { setTheme as setLocalTheme } from '@/utils/storage';
 import type { UserSettings } from '@/types';
+
+export interface UpdateProfileInput {
+  college: string;
+  graduationYear: number;
+  targetCompanies: string[];
+}
 
 interface UseUserSettingsResult {
   settings: UserSettings | null;
   loading: boolean;
   hasGeminiKey: boolean;
   updateGeminiApiKey: (apiKey: string) => Promise<void>;
+  updateProfile: (input: UpdateProfileInput) => Promise<void>;
+  updateThemePreference: (theme: UserSettings['theme']) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -55,6 +65,17 @@ export function useUserSettings(userId: string | null): UseUserSettingsResult {
     void fetchSettings();
   }, [fetchSettings]);
 
+  useEffect(() => {
+    if (settings?.theme) {
+      setLocalTheme(settings.theme);
+      if (settings.theme === 'light' || settings.theme === 'dark') {
+        applyTheme(settings.theme);
+      } else {
+        applyTheme(getResolvedTheme());
+      }
+    }
+  }, [settings?.theme]);
+
   const updateGeminiApiKey = useCallback(
     async (apiKey: string): Promise<void> => {
       if (!userId) {
@@ -75,11 +96,61 @@ export function useUserSettings(userId: string | null): UseUserSettingsResult {
     [userId, fetchSettings]
   );
 
+  const updateProfile = useCallback(
+    async (input: UpdateProfileInput): Promise<void> => {
+      if (!userId) {
+        throw new Error('Not signed in');
+      }
+
+      const { error } = await supabase
+        .from('user_settings')
+        .update({
+          college: input.college.trim(),
+          graduation_year: input.graduationYear,
+          target_companies: input.targetCompanies,
+        })
+        .eq('user_id', userId);
+
+      if (error) {
+        throw new Error(formatSupabaseError(error));
+      }
+
+      await fetchSettings({ silent: true });
+    },
+    [userId, fetchSettings]
+  );
+
+  const updateThemePreference = useCallback(
+    async (theme: UserSettings['theme']): Promise<void> => {
+      if (!userId) {
+        throw new Error('Not signed in');
+      }
+
+      const { error } = await supabase.from('user_settings').update({ theme }).eq('user_id', userId);
+
+      if (error) {
+        throw new Error(formatSupabaseError(error));
+      }
+
+      setLocalTheme(theme);
+      if (theme === 'light' || theme === 'dark') {
+        applyTheme(theme);
+      } else {
+        applyTheme(getResolvedTheme());
+      }
+
+      await fetchSettings({ silent: true });
+    },
+    [userId, fetchSettings]
+  );
+
   return {
     settings,
     loading,
     hasGeminiKey: Boolean(settings?.gemini_api_key_encrypted?.trim()),
     updateGeminiApiKey,
+    updateProfile,
+    updateThemePreference,
     refresh: fetchSettings,
   };
 }

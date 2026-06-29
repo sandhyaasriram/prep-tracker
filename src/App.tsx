@@ -11,7 +11,9 @@ import { InterviewPrepPage } from '@/pages/InterviewPrepPage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { CertificationsPage } from '@/pages/CertificationsPage';
 import { JournalPage } from '@/pages/JournalPage';
-import { PlaceholderPage } from '@/pages/placeholderRoutes';
+import { WeeklyReviewPage } from '@/pages/WeeklyReviewPage';
+import { TimelinePage } from '@/pages/TimelinePage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { MainLayout, type AppNavRoute } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui';
 import { useAuth } from '@/hooks/useAuth';
@@ -162,11 +164,11 @@ export default function App() {
       case 'Journal':
         return <JournalPage user={user} />;
       case 'Weekly Review':
-        return <PlaceholderPage title="Weekly Review" description="This section will be built in Phase 10." user={user} />;
+        return <WeeklyReviewPage user={user} />;
       case 'Timeline':
-        return <PlaceholderPage title="Timeline" description="This section will be built in Phase 10." user={user} />;
+        return <TimelinePage user={user} />;
       case 'Settings':
-        return <PlaceholderPage title="Settings" description="This section will be built in Phase 10." user={user} />;
+        return <SettingsPage user={user} />;
       case 'Dashboard':
       default:
         return <MissionControlPage user={user} />;

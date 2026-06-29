@@ -128,6 +128,64 @@
   .type-italic {
     @apply italic;
   }
+
+  /* Soft horizontal/vertical scrollbars — use on overflow containers */
+  .scrollbar-soft {
+    scrollbar-width: thin;
+    scrollbar-color: #C9C2B8 #F3F0EB;
+  }
+
+  .scrollbar-soft::-webkit-scrollbar {
+    height: 7px;
+    width: 7px;
+  }
+
+  .scrollbar-soft::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .scrollbar-soft::-webkit-scrollbar-track {
+    margin: 0 8px;
+    background: transparent;
+  }
+
+  .scrollbar-soft::-webkit-scrollbar-thumb {
+    background-color: #C9C2B8;
+    border-radius: 9999px;
+  }
+
+  .scrollbar-soft::-webkit-scrollbar-thumb:active {
+    background-color: #1c228d;
+  }
+
+  .scrollbar-soft::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  html[data-theme='dark'] .scrollbar-soft {
+    scrollbar-color: #4B5563 #1C2028;
+  }
+
+  html[data-theme='dark'] .scrollbar-soft::-webkit-scrollbar-thumb {
+    background-color: #4B5563;
+  }
+
+  html[data-theme='dark'] .scrollbar-soft::-webkit-scrollbar-thumb:active {
+    background-color: #1c228d;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
