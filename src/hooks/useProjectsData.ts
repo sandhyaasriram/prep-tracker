@@ -10,14 +10,16 @@ import { formatSupabaseError } from '@/utils/errors';
 import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
 import { runOptimisticMutation } from '@/utils/optimisticMutation';
 import type { Project, ProjectChecklistItem } from '@/types';
-import type { ProjectWithChecklist, ProjectsViewData, UpdateProjectInput } from '@/types/projects';
+import type { CreateProjectInput, ProjectWithChecklist, ProjectsViewData, UpdateProjectInput } from '@/types/projects';
 
 interface UseProjectsDataResult {
   data: ProjectsViewData | null;
   loading: boolean;
   error: string | null;
   updateProject: (id: string, input: UpdateProjectInput) => Promise<void>;
+  createProject: (input: CreateProjectInput) => Promise<void>;
   promoteProject: (id: string) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   toggleChecklistItem: (itemId: string, completed: boolean) => Promise<void>;
   refresh: (options?: { silent?: boolean }) => Promise<void>;
 }
@@ -101,7 +103,8 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
       }
 
       const merged = mergeProjects(projectRows, checklistRows);
-      setProjects(merged);    } catch (fetchError) {
+      setProjects(merged);
+    } catch (fetchError) {
       setError(formatSupabaseError(fetchError));
       if (!hydratedRef.current) {
         setProjects([]);
@@ -146,9 +149,11 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
 
       await runOptimisticMutation({
         apply: () => {
-          setProjects(optimistic);        },
+          setProjects(optimistic);
+        },
         revert: () => {
-          setProjects(previous);        },
+          setProjects(previous);
+        },
         persist: async () => {
           const payload: Record<string, unknown> = {};
           if (input.status !== undefined) payload.status = input.status;
@@ -162,6 +167,100 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
       });
     },
     [projects]
+  );
+
+  const createProject = useCallback(
+    async (input: CreateProjectInput): Promise<void> => {
+      if (!userId) {
+        return;
+      }
+
+      const previous = projects;
+      const now = new Date().toISOString();
+      const tempId = crypto.randomUUID();
+      const tempChecklist: ProjectChecklistItem[] = PROJECT_CHECKLIST_ITEMS.map((item) => ({
+        id: crypto.randomUUID(),
+        project_id: tempId,
+        item,
+        completed: false,
+        created_at: now,
+        updated_at: now,
+      }));
+      const tempProject: ProjectWithChecklist = {
+        id: tempId,
+        user_id: userId,
+        name: input.name.trim(),
+        tech_stack: input.techStack,
+        status: input.status,
+        github_url: input.githubUrl.trim(),
+        demo_url: input.demoUrl.trim(),
+        type: 'existing',
+        placement_relevance: input.placementRelevance.trim(),
+        notes: input.notes.trim(),
+        created_at: now,
+        updated_at: now,
+        checklist: tempChecklist,
+      };
+
+      const optimistic = [tempProject, ...projects];
+
+      await runOptimisticMutation({
+        apply: () => {
+          setProjects(optimistic);
+        },
+        revert: () => {
+          setProjects(previous);
+        },
+        persist: async () => {
+          const { data: insertedProject, error: insertProjectError } = await supabase
+            .from('projects')
+            .insert({
+              user_id: userId,
+              name: input.name.trim(),
+              tech_stack: input.techStack,
+              status: input.status,
+              github_url: input.githubUrl.trim(),
+              demo_url: input.demoUrl.trim(),
+              placement_relevance: input.placementRelevance.trim(),
+              notes: input.notes.trim(),
+              type: 'existing',
+            })
+            .select('*')
+            .single();
+
+          if (insertProjectError) {
+            throw insertProjectError;
+          }
+
+          const checklistPayload = PROJECT_CHECKLIST_ITEMS.map((item) => ({
+            project_id: insertedProject.id,
+            item,
+            completed: false,
+          }));
+
+          const { data: insertedChecklist, error: checklistError } = await supabase
+            .from('project_checklist')
+            .insert(checklistPayload)
+            .select('*');
+
+          if (checklistError) {
+            throw checklistError;
+          }
+
+          const realProject = insertedProject as Project;
+
+          setProjects((current) =>
+            current.map((project) =>
+              project.id === tempId
+                ? { ...realProject, checklist: (insertedChecklist ?? []) as ProjectChecklistItem[] }
+                : project
+            )
+          );
+        },
+        errorMessage: 'Could not create project.',
+      });
+    },
+    [projects, userId]
   );
 
   const promoteProject = useCallback(
@@ -184,9 +283,11 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
 
       await runOptimisticMutation({
         apply: () => {
-          setProjects(optimistic);        },
+          setProjects(optimistic);
+        },
         revert: () => {
-          setProjects(previous);        },
+          setProjects(previous);
+        },
         persist: async () => {
           const { error: updateError } = await supabase
             .from('projects')
@@ -211,10 +312,40 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
               project.id === id
                 ? { ...project, checklist: (inserted ?? []) as ProjectChecklistItem[] }
                 : project
-            );            return next;
+            );
+            return next;
           });
         },
         errorMessage: 'Could not promote project.',
+      });
+    },
+    [projects]
+  );
+
+  const deleteProject = useCallback(
+    async (id: string): Promise<void> => {
+      const previous = projects;
+      const optimistic = projects.filter((project) => project.id !== id);
+
+      await runOptimisticMutation({
+        apply: () => {
+          setProjects(optimistic);
+        },
+        revert: () => {
+          setProjects(previous);
+        },
+        persist: async () => {
+          const { error: checklistError } = await supabase.from('project_checklist').delete().eq('project_id', id);
+          if (checklistError) {
+            throw checklistError;
+          }
+
+          const { error: projectError } = await supabase.from('projects').delete().eq('id', id);
+          if (projectError) {
+            throw projectError;
+          }
+        },
+        errorMessage: 'Could not delete project.',
       });
     },
     [projects]
@@ -232,9 +363,11 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
 
       await runOptimisticMutation({
         apply: () => {
-          setProjects(optimistic);        },
+          setProjects(optimistic);
+        },
         revert: () => {
-          setProjects(previous);        },
+          setProjects(previous);
+        },
         persist: async () => {
           const { error: updateError } = await supabase.from('project_checklist').update({ completed }).eq('id', itemId);
           if (updateError) throw updateError;
@@ -250,7 +383,9 @@ export function useProjectsData(userId: string | null): UseProjectsDataResult {
     loading,
     error,
     updateProject,
+    createProject,
     promoteProject,
+    deleteProject,
     toggleChecklistItem,
     refresh: fetchData,
   };

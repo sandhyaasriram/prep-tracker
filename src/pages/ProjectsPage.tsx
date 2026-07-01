@@ -3,9 +3,10 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import { Button, Card, CardBody } from '@/components';
 import { ProjectCard } from '@/features/projects/ProjectCard';
+import { ProjectCreateModal } from '@/features/projects/ProjectCreateModal';
 import { ProjectDetailModal } from '@/features/projects/ProjectDetailModal';
 import { useProjectsData } from '@/hooks/useProjectsData';
 import { exportToCSV, generateCSVFilename } from '@/utils';
@@ -19,8 +20,9 @@ interface ProjectsPageProps {
  * Existing and suggested projects with resume checklists.
  */
 export function ProjectsPage({ user }: ProjectsPageProps) {
-  const { data, loading, error, updateProject, promoteProject, toggleChecklistItem } = useProjectsData(user.id);
+  const { data, loading, error, updateProject, createProject, promoteProject, deleteProject, toggleChecklistItem } = useProjectsData(user.id);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectId || !data) {
@@ -76,9 +78,14 @@ export function ProjectsPage({ user }: ProjectsPageProps) {
             Portfolio projects, deployment links, and resume-ready checklists.
           </p>
         </div>
-        <Button variant="secondary" size="sm" icon={<Download size={14} />} onClick={handleExport}>
-          Export CSV
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={() => setIsCreateOpen(true)}>
+            Add Project
+          </Button>
+          <Button variant="secondary" size="sm" icon={<Download size={14} />} onClick={handleExport}>
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -92,7 +99,7 @@ export function ProjectsPage({ user }: ProjectsPageProps) {
         <h2 className="text-lg font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Existing projects</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {data.existing.map((project) => (
-            <ProjectCard key={project.id} project={project} onSelect={(p) => setSelectedProjectId(p.id)} />
+            <ProjectCard key={project.id} project={project} onSelect={(p) => setSelectedProjectId(p.id)} onDelete={deleteProject} />
           ))}
         </div>
       </section>
@@ -106,10 +113,17 @@ export function ProjectsPage({ user }: ProjectsPageProps) {
               project={project}
               onSelect={(p) => setSelectedProjectId(p.id)}
               onPromote={async (p) => promoteProject(p.id)}
+              onDelete={deleteProject}
             />
           ))}
         </div>
       </section>
+
+      <ProjectCreateModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        createProject={createProject}
+      />
 
       <ProjectDetailModal
         project={selectedProject}

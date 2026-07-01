@@ -26,3 +26,13 @@ export interface UpdateProjectInput {
   demoUrl?: string;
   notes?: string;
 }
+
+export interface CreateProjectInput {
+  name: string;
+  techStack: string[];
+  status: ProjectStatus;
+  githubUrl: string;
+  demoUrl: string;
+  placementRelevance: string;
+  notes: string;
+}

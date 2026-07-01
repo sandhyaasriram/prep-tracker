@@ -52,7 +52,7 @@ export function useAuth(): UseAuthResult {
     if (error) {
       throw error;
     }
-    setUser(data.user ?? null);
+    setUser(data.session?.user ?? data.user ?? null);
   };
 
   const signUp = async (email: string, password: string): Promise<void> => {
@@ -60,7 +60,9 @@ export function useAuth(): UseAuthResult {
     if (error) {
       throw error;
     }
-    setUser(data.user ?? null);
+    // Only treat signup as authenticated when Supabase returns an active session.
+    // This prevents first-login seeding from running before RLS-authenticated access exists.
+    setUser(data.session?.user ?? null);
   };
 
   const signOut = async (): Promise<void> => {

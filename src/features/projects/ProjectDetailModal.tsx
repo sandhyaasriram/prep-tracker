@@ -101,7 +101,10 @@ export function ProjectDetailModal({ project, onClose, onUpdate, onToggleCheckli
 
         {project.checklist.length > 0 && (
           <div className="rounded-xl border border-[#E8E3DC] p-4 dark:border-[#232830]">
-            <h3 className="text-sm font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Resume-ready checklist</h3>
+            <p className="text-xs text-[#7A736B] dark:text-[#6B7280]">
+              Track what this project needs before you can confidently list it on your resume or talk about it in an interview.
+            </p>
+            <h3 className="mt-2 text-sm font-semibold text-[#1A1614] dark:text-[#E8EDF2]">Resume readiness</h3>
             <ul className="mt-3 space-y-2">
               {project.checklist.map((item) => (
                 <li key={item.id} className="flex items-center gap-2">
@@ -125,3 +128,4 @@ export function ProjectDetailModal({ project, onClose, onUpdate, onToggleCheckli
     </Modal>
   );
 }
+

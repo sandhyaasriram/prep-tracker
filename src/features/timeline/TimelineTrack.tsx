@@ -4,9 +4,10 @@
  */
 
 import { useMemo } from 'react';
+import { addDays, format, parse } from 'date-fns';
 import { HorizontalScrollArea } from '@/components';
 import profileSeed from '@/seed/profile.json';
-import { TIMELINE_CATEGORY_COLORS } from '@/constants';
+import { DATE_FORMAT, TIMELINE_CATEGORY_COLORS } from '@/constants';
 import { formatDisplayDate, todayIST } from '@/utils';
 import type { TimelineCategory, TimelineMilestone } from '@/types/timeline';
 
@@ -50,8 +51,8 @@ function computeTrackRange(milestones: TimelineMilestone[], seasonStart: string,
   const latest = sorted[sorted.length - 1] ?? seasonEnd;
 
   const padDays = 12;
-  const start = new Date(parseDay(earliest) - padDays * 86400000).toISOString().slice(0, 10);
-  const end = new Date(parseDay(latest) + padDays * 86400000).toISOString().slice(0, 10);
+  const start = format(addDays(parse(earliest, DATE_FORMAT, new Date()), -padDays), DATE_FORMAT);
+  const end = format(addDays(parse(latest, DATE_FORMAT, new Date()), padDays), DATE_FORMAT);
   const totalDays = Math.max(daysBetween(start, end), 1);
 
   return { start, end, totalDays };
