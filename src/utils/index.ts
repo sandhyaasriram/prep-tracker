@@ -4,6 +4,7 @@
 
 import { addDays, differenceInCalendarDays, format, parse } from 'date-fns';
 import { DISPLAY_DATE_FORMAT, DISPLAY_DATETIME_FORMAT, DATE_FORMAT, IST_OFFSET_MS, PEAK_SEASON_START } from '@/constants';
+import { getISTHour, toISTDateString } from '@/utils/istDate';
 
 const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T/;
 
@@ -76,18 +77,17 @@ export function formatDisplayDateTime(dateString: string): string {
 }
 
 /**
- * Convert UTC date to IST string (YYYY-MM-DD).
+ * Convert UTC instant to IST calendar date string (YYYY-MM-DD).
  */
 export function toIST(utcDate: Date): string {
-  const istDate = new Date(utcDate.getTime() + IST_OFFSET_MS);
-  return format(istDate, DATE_FORMAT);
+  return toISTDateString(utcDate);
 }
 
 /**
  * Get today's date as YYYY-MM-DD string in IST.
  */
 export function todayIST(): string {
-  return toIST(new Date());
+  return toISTDateString();
 }
 
 /**
@@ -135,7 +135,7 @@ export type TimeOfDayGreeting = 'Morning' | 'Afternoon' | 'Evening';
  * 5am–11:59am → Morning; 12pm–4:59pm → Afternoon; 5pm–4:59am → Evening.
  */
 export function getTimeOfDayGreeting(date = new Date()): TimeOfDayGreeting {
-  const hour = date.getHours();
+  const hour = getISTHour(date);
 
   if (hour >= 5 && hour < 12) {
     return 'Morning';
@@ -328,4 +328,11 @@ export function getCurrentPhase(phaseSchedule: Array<{ name: string; start: stri
 /**
  * Calculate percentage complete.
  */
-export { calculatePercentage, calculateSeasonProgress, calculateWeeklyProgress } from './progress';
+export { calculatePercentage, calculateSeasonProgress, calculateWeeklyProgress, getCalendarWeekGoalStats } from './progress';
+export {
+  buildCalendarWeekDefinitions,
+  getCalendarWeekRange,
+  getCalendarWeekNumber,
+  goalsInCalendarWeek,
+  CALENDAR_WEEK_ANCHOR,
+} from './calendarWeek';

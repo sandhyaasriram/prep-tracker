@@ -2,32 +2,14 @@
  * Shared progress calculations for nav bar and dashboard.
  */
 
-import { format } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
-import { DATE_FORMAT, IST_OFFSET_MS } from '@/constants';
+import { goalsInCalendarWeek } from '@/utils/calendarWeek';
+import { todayIST } from '@/utils';
 
 interface WeeklyGoalLike {
   start_date: string;
   end_date: string;
   completed: boolean;
-}
-
-function todayIST(): string {
-  const istDate = new Date(Date.now() + IST_OFFSET_MS);
-  return format(istDate, DATE_FORMAT);
-}
-
-function chooseCurrentOrUpcomingGoal<T extends WeeklyGoalLike>(goals: T[], today: string): T | undefined {
-  const currentGoal = goals.find((goal) => goal.start_date <= today && goal.end_date >= today);
-  if (currentGoal) {
-    return currentGoal;
-  }
-
-  const upcomingGoals = goals
-    .filter((goal) => goal.start_date >= today)
-    .sort((left, right) => left.start_date.localeCompare(right.start_date));
-
-  return upcomingGoals[0] ?? goals[0];
 }
 
 /**
@@ -42,17 +24,28 @@ export function calculatePercentage(completed: number, total: number): number {
 }
 
 /**
- * Weekly goal completion for the current calendar week.
+ * Weekly goal completion for the current IST calendar week (Sun–Sat).
  */
 export function calculateWeeklyProgress(goals: WeeklyGoalLike[], today: string = todayIST()): number {
-  const weeklyCompleted = goals.filter(
-    (goal) => goal.start_date <= today && goal.end_date >= today && goal.completed
-  ).length;
-  const weeklyTotal =
-    goals.filter((goal) => goal.start_date <= today && goal.end_date >= today).length ||
-    (chooseCurrentOrUpcomingGoal(goals, today) ? 1 : 0);
+  const weekGoals = goalsInCalendarWeek(goals, today);
+  const weeklyCompleted = weekGoals.filter((goal) => goal.completed).length;
+  const weeklyTotal = weekGoals.length;
 
   return weeklyTotal > 0 ? Math.round((weeklyCompleted / weeklyTotal) * 100) : 0;
+}
+
+/**
+ * Stats for the current IST calendar week.
+ */
+export function getCalendarWeekGoalStats(goals: WeeklyGoalLike[], today: string = todayIST()): {
+  completed: number;
+  total: number;
+} {
+  const weekGoals = goalsInCalendarWeek(goals, today);
+  return {
+    completed: weekGoals.filter((goal) => goal.completed).length,
+    total: weekGoals.length,
+  };
 }
 
 /**

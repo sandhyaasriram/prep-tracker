@@ -6,7 +6,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
 import { supabase } from '@/lib/supabase';
 import { DATE_FORMAT, PEAK_SEASON_START, WEEKLY_GOALS_TARGETS } from '@/constants';
-import { calculateStreak, daysSince, daysUntil, getCurrentPhase, todayIST } from '@/utils';
+import { calculateStreak, daysSince, daysUntil, getCurrentPhase, goalsInCalendarWeek, todayIST } from '@/utils';
 import type { CoachApplicationStage, CoachChatContext, CoachContext, CoachWeeklyGoal } from '@/types/coach';
 
 interface DSAProblemRow {
@@ -100,7 +100,7 @@ function buildWeeklyGoalsContext(goals: WeeklyGoalRow[], today: string): {
   weeklyGoalsCompleted: number;
   weeklyGoalsTotal: number;
 } {
-  const currentGoals = goals.filter((goal) => goal.start_date <= today && goal.end_date >= today);
+  const currentGoals = goalsInCalendarWeek(goals, today);
   const weeklyGoals = currentGoals.map((goal) => ({
     category: goal.category,
     goalText: goal.goal_text,

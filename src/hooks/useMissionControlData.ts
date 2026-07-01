@@ -8,7 +8,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
 import { supabase } from '@/lib/supabase';
 import { useWeeklyGoals, type WeeklyGoalRow } from '@/context/WeeklyGoalsContext';
-import { calculateStreak, formatDisplayDate, getCurrentPhase, getTimeOfDayGreeting, todayIST, calculateWeeklyProgress, getPeakSeasonDashboardState } from '@/utils';
+import { calculateStreak, formatDisplayDate, getCalendarWeekGoalStats, getCalendarWeekRange, getCurrentPhase, getTimeOfDayGreeting, goalsInCalendarWeek, todayIST, calculateWeeklyProgress, getPeakSeasonDashboardState } from '@/utils';
 import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
 import type { MissionControlData, MissionTask, RecentActivityItem, UpcomingDeadline } from '@/types/mission-control';
 import type { DSADifficulty, Phase } from '@/types';
@@ -79,8 +79,7 @@ function buildFallbackMissionControlData(): MissionControlData {
   const today = todayIST();
   const currentDateLabel = formatDisplayDate(today);
   const firstName = profileSeed.name.split(' ')[0] ?? profileSeed.name;
-  const currentWeek = profileSeed.phase_schedule.find((phase) => today >= phase.start && today <= phase.end) ?? profileSeed.phase_schedule[0];
-  const weekRangeLabel = `${formatDisplayDate(currentWeek.start)} – ${formatDisplayDate(currentWeek.end)}`;
+  const calendarWeek = getCalendarWeekRange(today);
 
   return {
     firstName,
@@ -92,8 +91,8 @@ function buildFallbackMissionControlData(): MissionControlData {
       start: phase.start,
       end: phase.end,
     })),
-    currentWeekLabel: 'Week 1',
-    weekRangeLabel,
+    currentWeekLabel: `Week ${calendarWeek.weekNumber}`,
+    weekRangeLabel: `${formatDisplayDate(calendarWeek.startDate)} – ${formatDisplayDate(calendarWeek.endDate)}`,
     missionTasks: buildDefaultMissionTasks(),
     weeklyCompleted: 0,
     weeklyTotal: 0,
@@ -317,17 +316,6 @@ function findTopTopic(topics: DSATopicRow[], problems: DSAProblemRow[]): { name:
   return bestTopic;
 }
 
-function chooseCurrentOrUpcomingGoal(goals: WeeklyGoalRow[], today: string): WeeklyGoalRow | undefined {
-  const currentGoal = goals.find((goal) => goal.start_date <= today && goal.end_date >= today);
-  if (currentGoal) return currentGoal;
-
-  const upcomingGoals = goals
-    .filter((goal) => goal.start_date >= today)
-    .sort((left, right) => left.start_date.localeCompare(right.start_date));
-
-  return upcomingGoals[0] ?? goals[0];
-}
-
 export interface UseMissionControlDataResult {
   data: MissionControlData | null;
   loading: boolean;
@@ -393,7 +381,9 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
       const currentPhase = getCurrentPhase(profileSeed.phase_schedule) as Phase;
       const firstName = profileSeed.name.split(' ')[0] ?? profileSeed.name;
       const currentDateLabel = formatDisplayDate(today);
-      const currentGoal = chooseCurrentOrUpcomingGoal(weeklyGoalsSnapshot, today);
+      const calendarWeek = getCalendarWeekRange(today);
+      const currentWeekGoals = goalsInCalendarWeek(weeklyGoalsSnapshot, today);
+      const currentGoal = currentWeekGoals[0];
       const topDsaTopic = findTopTopic(topics, dsaProblems);
       const nextCertification = certifications.find((cert) => cert.status === 'In Progress') ?? certifications[0];
       const nextApplication = applications.find((application) => application.stage !== 'Offer' && application.stage !== 'Rejected');
@@ -405,8 +395,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
         application: nextApplication,
       });
 
-      const weeklyCompleted = weeklyGoalsSnapshot.filter((goal) => goal.start_date <= today && goal.end_date >= today && goal.completed).length;
-      const weeklyTotal = weeklyGoalsSnapshot.filter((goal) => goal.start_date <= today && goal.end_date >= today).length || (currentGoal ? 1 : 0);
+      const { completed: weeklyCompleted, total: weeklyTotal } = getCalendarWeekGoalStats(weeklyGoalsSnapshot, today);
       const weeklyProgressPercent = calculateWeeklyProgress(weeklyGoalsSnapshot, today);
 
       const solvedDates = dsaProblems.filter((problem) => problem.solved && problem.solved_date).map((problem) => problem.solved_date as string);
@@ -452,8 +441,8 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
           start: phase.start,
           end: phase.end,
         })),
-        currentWeekLabel: currentGoal ? `Week ${currentGoal.week_number}` : 'Week 1',
-        weekRangeLabel: currentGoal ? `${formatDisplayDate(currentGoal.start_date)} – ${formatDisplayDate(currentGoal.end_date)}` : 'Preparing for the first placement week',
+        currentWeekLabel: `Week ${calendarWeek.weekNumber}`,
+        weekRangeLabel: `${formatDisplayDate(calendarWeek.startDate)} – ${formatDisplayDate(calendarWeek.endDate)}`,
         missionTasks,
         weeklyCompleted,
         weeklyTotal,
@@ -520,12 +509,7 @@ export function useMissionControlData(userId: string | null): UseMissionControlD
     if (!data) return null;
 
     const today = todayIST();
-    const weeklyCompleted = weeklyGoals.filter(
-      (goal) => goal.start_date <= today && goal.end_date >= today && goal.completed
-    ).length;
-    const weeklyTotal =
-      weeklyGoals.filter((goal) => goal.start_date <= today && goal.end_date >= today).length ||
-      (chooseCurrentOrUpcomingGoal(weeklyGoals, today) ? 1 : 0);
+    const { completed: weeklyCompleted, total: weeklyTotal } = getCalendarWeekGoalStats(weeklyGoals, today);
     const weeklyProgressPercent = calculateWeeklyProgress(weeklyGoals, today);
 
     return {

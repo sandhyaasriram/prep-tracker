@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatSupabaseError } from '@/utils/errors';
-import { buildWeekDefinitions, getCurrentWeekNumber } from '@/utils/weekUtils';
+import { buildCalendarWeekDefinitions } from '@/utils/calendarWeek';
+import { getCurrentWeekNumber } from '@/utils/weekUtils';
 import { todayIST } from '@/utils';
 import { markHydrated, resetHydrated, shouldShowInitialLoading } from '@/utils/hydratedFetch';
 import { runOptimisticMutation } from '@/utils/optimisticMutation';
@@ -99,7 +100,7 @@ export function useWeeklyReviewData(userId: string | null): UseWeeklyReviewDataR
       if (goalsResult.error) throw goalsResult.error;
       if (reviewsResult.error) throw reviewsResult.error;
 
-      const weekDefinitions = buildWeekDefinitions((goalsResult.data ?? []) as WeekDefinition[]);
+      const weekDefinitions = buildCalendarWeekDefinitions();
       const reviewRows = (reviewsResult.data ?? []) as WeeklyReview[];
 
       setWeeks(weekDefinitions);

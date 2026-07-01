@@ -5,55 +5,30 @@
 import { addDays, format, parse } from 'date-fns';
 import { DATE_FORMAT } from '@/constants';
 import type { WeekDefinition } from '@/types/weekly-review';
+import {
+  buildCalendarWeekDefinitions,
+  getCalendarWeekRangeByNumber,
+  getCurrentCalendarWeekNumber,
+} from '@/utils/calendarWeek';
 import { todayIST } from '@/utils';
 
 const REVIEW_LOCK_DAYS = 7;
 
 /**
- * Build unique week definitions from weekly goal rows.
+ * @deprecated Use buildCalendarWeekDefinitions — weeks are IST Sun–Sat, not derived from goal rows.
  */
 export function buildWeekDefinitions(
   goals: Array<{ week_number: number; start_date: string; end_date: string }>
 ): WeekDefinition[] {
-  const weekMap = new Map<number, WeekDefinition>();
-
-  for (const goal of goals) {
-    const existing = weekMap.get(goal.week_number);
-    if (!existing) {
-      weekMap.set(goal.week_number, {
-        week_number: goal.week_number,
-        start_date: goal.start_date,
-        end_date: goal.end_date,
-      });
-      continue;
-    }
-
-    if (goal.start_date < existing.start_date) {
-      existing.start_date = goal.start_date;
-    }
-    if (goal.end_date > existing.end_date) {
-      existing.end_date = goal.end_date;
-    }
-  }
-
-  return [...weekMap.values()].sort((left, right) => left.week_number - right.week_number);
+  void goals;
+  return buildCalendarWeekDefinitions();
 }
 
 /**
- * Resolve the active week for today, falling back to nearest week.
+ * Resolve the active calendar week number for today.
  */
 export function getCurrentWeekNumber(weeks: WeekDefinition[], today: string = todayIST()): number {
-  const current = weeks.find((week) => today >= week.start_date && today <= week.end_date);
-  if (current) {
-    return current.week_number;
-  }
-
-  const upcoming = weeks.find((week) => week.start_date > today);
-  if (upcoming) {
-    return upcoming.week_number;
-  }
-
-  return weeks[weeks.length - 1]?.week_number ?? 1;
+  return getCurrentCalendarWeekNumber(weeks, today);
 }
 
 /**
@@ -90,3 +65,5 @@ export function calculateReviewCompletion(review: {
 
   return Math.round(((filled + extras) / total) * 100);
 }
+
+export { getCalendarWeekRangeByNumber };

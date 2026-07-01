@@ -19,6 +19,7 @@ import dsaProblemsSeed from '@/seed/dsa-problems.json';
 import certificationsSeed from '@/seed/certifications.json';
 import projectsSeed from '@/seed/projects.json';
 import weeklyGoalsSeed from '@/seed/weekly-goals.json';
+import { getCalendarWeekRangeByNumber } from '@/utils/calendarWeek';
 import csFoundamentalsSeed from '@/seed/cs-fundamentals.json';
 import timelineMilestonesSeed from '@/seed/timeline-milestones.json';
 
@@ -290,16 +291,20 @@ async function seedProjects(userId: string): Promise<void> {
 }
 
 async function seedWeeklyGoals(userId: string): Promise<void> {
-  const toInsert = weeklyGoalsSeed.weeks.map((goal) => ({
-    user_id: userId,
-    week_number: goal.week_number,
-    start_date: goal.start_date,
-    end_date: goal.end_date,
-    category: goal.category,
-    goal_text: goal.goal_text,
-    completed: goal.completed,
-    notes: goal.notes,
-  }));
+  const toInsert = weeklyGoalsSeed.weeks.map((goal) => {
+    const { startDate, endDate } = getCalendarWeekRangeByNumber(goal.week_number);
+
+    return {
+      user_id: userId,
+      week_number: goal.week_number,
+      start_date: startDate,
+      end_date: endDate,
+      category: goal.category,
+      goal_text: goal.goal_text,
+      completed: goal.completed,
+      notes: goal.notes,
+    };
+  });
 
   await insertInBatches('weekly_goals', toInsert);
 }
