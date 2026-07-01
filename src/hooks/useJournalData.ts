@@ -15,7 +15,7 @@ interface UseJournalDataResult {
   data: JournalViewData | null;
   loading: boolean;
   error: string | null;
-  upsertEntry: (input: UpsertJournalEntryInput) => Promise<void>;
+  upsertEntry: (input: UpsertJournalEntryInput) => Promise<string>;
   deleteEntry: (id: string) => Promise<void>;
   refresh: (options?: { silent?: boolean }) => Promise<void>;
 }
@@ -47,14 +47,16 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
         .from('journal_entries')
         .select('*')
         .eq('user_id', userId)
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
 
       if (fetchError) {
         throw fetchError;
       }
 
       const next = (data ?? []) as JournalEntry[];
-      setEntries(next);    } catch (fetchError) {
+      setEntries(next);
+    } catch (fetchError) {
       setError(formatSupabaseError(fetchError));
       if (!hydratedRef.current) {
         setEntries([]);
@@ -77,37 +79,40 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
 
     return {
       entries,
-      datesWithEntries: entries.map((entry) => entry.date),
+      datesWithEntries: [...new Set(entries.map((entry) => entry.date))].sort((left, right) => right.localeCompare(left)),
     };
   }, [entries, userId]);
 
   const upsertEntry = useCallback(
-    async (input: UpsertJournalEntryInput): Promise<void> => {
+    async (input: UpsertJournalEntryInput): Promise<string> => {
       if (!userId) throw new Error('Not authenticated');
 
-      const existing = entries.find((entry) => entry.date === input.date);
       const previous = entries;
 
-      if (existing) {
+      if (input.id) {
         const optimistic = entries.map((entry) =>
-          entry.id === existing.id ? { ...entry, content_markdown: input.contentMarkdown } : entry
+          entry.id === input.id
+            ? { ...entry, title: input.title, content_markdown: input.contentMarkdown }
+            : entry
         );
 
         await runOptimisticMutation({
           apply: () => {
-            setEntries(optimistic);          },
+            setEntries(optimistic);
+          },
           revert: () => {
-            setEntries(previous);          },
+            setEntries(previous);
+          },
           persist: async () => {
             const { error: updateError } = await supabase
               .from('journal_entries')
-              .update({ content_markdown: input.contentMarkdown })
-              .eq('id', existing.id);
+              .update({ title: input.title, content_markdown: input.contentMarkdown })
+              .eq('id', input.id);
             if (updateError) throw updateError;
           },
           errorMessage: 'Could not save journal entry.',
         });
-        return;
+        return input.id;
       }
 
       const tempId = crypto.randomUUID();
@@ -116,17 +121,21 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
         id: tempId,
         user_id: userId,
         date: input.date,
+        title: input.title,
         content_markdown: input.contentMarkdown,
         created_at: now,
         updated_at: now,
       };
       const optimistic = [optimisticEntry, ...entries];
+      let savedId: string = tempId;
 
       await runOptimisticMutation({
         apply: () => {
-          setEntries(optimistic);        },
+          setEntries(optimistic);
+        },
         revert: () => {
-          setEntries(previous);        },
+          setEntries(previous);
+        },
         persist: async () => {
           const { data: inserted, error: insertError } = await supabase
             .from('journal_entries')
@@ -134,18 +143,23 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
               {
                 user_id: userId,
                 date: input.date,
+                title: input.title,
                 content_markdown: input.contentMarkdown,
               },
             ])
             .select('*')
             .single();
           if (insertError) throw insertError;
+          savedId = (inserted as JournalEntry).id;
           setEntries((current) => {
-            const next = current.map((entry) => (entry.id === tempId ? (inserted as JournalEntry) : entry));            return next;
+            const next = current.map((entry) => (entry.id === tempId ? (inserted as JournalEntry) : entry));
+            return next;
           });
         },
         errorMessage: 'Could not save journal entry.',
       });
+
+      return savedId;
     },
     [userId, entries]
   );
@@ -157,9 +171,11 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
 
       await runOptimisticMutation({
         apply: () => {
-          setEntries(optimistic);        },
+          setEntries(optimistic);
+        },
         revert: () => {
-          setEntries(previous);        },
+          setEntries(previous);
+        },
         persist: async () => {
           const { error: deleteError } = await supabase.from('journal_entries').delete().eq('id', id);
           if (deleteError) throw deleteError;
@@ -185,8 +201,23 @@ export function useJournalData(userId: string | null): UseJournalDataResult {
  */
 export function exportJournalMarkdown(entries: JournalEntry[]): void {
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
-  const body = sorted
-    .map((entry) => `## ${entry.date}\n\n${entry.content_markdown.trim() || '_Empty entry_'}\n`)
+  const groupedByDate = new Map<string, JournalEntry[]>();
+
+  for (const entry of sorted) {
+    const existing = groupedByDate.get(entry.date) ?? [];
+    existing.push(entry);
+    groupedByDate.set(entry.date, existing);
+  }
+
+  const body = [...groupedByDate.entries()]
+    .map(([date, dateEntries]) => {
+      const sections = [...dateEntries]
+        .sort((left, right) => left.created_at.localeCompare(right.created_at))
+        .map((entry) => `### ${entry.title?.trim() || 'Untitled entry'}\n\n${entry.content_markdown.trim() || '_Empty entry_'}\n`)
+        .join('\n');
+
+      return `## ${date}\n\n${sections}`;
+    })
     .join('\n---\n\n');
 
   const markdown = `# Placement OS Journal\n\nExported ${todayIST()}\n\n---\n\n${body}`;

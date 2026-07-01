@@ -10,6 +10,8 @@ export interface JournalViewData {
 }
 
 export interface UpsertJournalEntryInput {
+  id?: string;
   date: string;
+  title: string | null;
   contentMarkdown: string;
 }

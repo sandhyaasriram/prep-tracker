@@ -155,6 +155,7 @@ export interface JournalEntry {
   id: string;
   user_id: string;
   date: string;
+  title: string | null;
   content_markdown: string;
   created_at: string;
   updated_at: string;
