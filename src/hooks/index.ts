@@ -10,4 +10,4 @@
 // - useWeeklyProgress() — calculate weekly stats
 // - usePhaseInfo() — get current phase and related data
 // - useUserSettings() — get/update user preferences
-// - useGeminiCoach() — manage AI coach state and caching
+// - useCoachData() — persistent daily AI coach chat

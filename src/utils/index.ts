@@ -3,60 +3,9 @@
  */
 
 import { addDays, differenceInCalendarDays, format, parse } from 'date-fns';
-import { DISPLAY_DATE_FORMAT, DISPLAY_DATETIME_FORMAT, DATE_FORMAT, PEAK_SEASON_START } from '@/constants';
+import { DISPLAY_DATE_FORMAT, DISPLAY_DATETIME_FORMAT, DATE_FORMAT, IST_OFFSET_MS, PEAK_SEASON_START } from '@/constants';
 
 const ISO_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T/;
-const IST_TIME_ZONE = 'Asia/Kolkata';
-
-const IST_DATE_PARTS_FORMATTER = new Intl.DateTimeFormat('en-CA', {
-  timeZone: IST_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-const IST_DATETIME_PARTS_FORMATTER = new Intl.DateTimeFormat('en-GB', {
-  timeZone: IST_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
-
-function getISTDateParts(date: Date): { year: string; month: string; day: string } {
-  const parts = IST_DATE_PARTS_FORMATTER.formatToParts(date);
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-
-  if (!year || !month || !day) {
-    return {
-      year: String(date.getUTCFullYear()),
-      month: String(date.getUTCMonth() + 1).padStart(2, '0'),
-      day: String(date.getUTCDate()).padStart(2, '0'),
-    };
-  }
-
-  return { year, month, day };
-}
-
-function getISTDateTimeParts(date: Date): { year: string; month: string; day: string; hour: string; minute: string } {
-  const parts = IST_DATETIME_PARTS_FORMATTER.formatToParts(date);
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-  const hour = parts.find((part) => part.type === 'hour')?.value;
-  const minute = parts.find((part) => part.type === 'minute')?.value;
-
-  if (!year || !month || !day || !hour || !minute) {
-    const fallback = getISTDateParts(date);
-    return { ...fallback, hour: '00', minute: '00' };
-  }
-
-  return { year, month, day, hour, minute };
-}
 
 /**
  * Format a UTC ISO timestamp for display in IST (e.g. "29 Jun 26 · 23:10 IST").
@@ -77,10 +26,15 @@ export function formatTimestampIST(value: string): string {
     return value;
   }
 
-  const { year, month, day, hour, minute } = getISTDateTimeParts(utc);
-  const datePart = format(parse(`${year}-${month}-${day}`, DATE_FORMAT, new Date()), 'dd MMM yy');
+  const ist = new Date(utc.getTime() + IST_OFFSET_MS);
+  const datePart = format(
+    new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate())),
+    'dd MMM yy'
+  );
+  const hours = String(ist.getUTCHours()).padStart(2, '0');
+  const minutes = String(ist.getUTCMinutes()).padStart(2, '0');
 
-  return `${datePart} · ${hour}:${minute} IST`;
+  return `${datePart} · ${hours}:${minutes} IST`;
 }
 
 /**
@@ -125,8 +79,8 @@ export function formatDisplayDateTime(dateString: string): string {
  * Convert UTC date to IST string (YYYY-MM-DD).
  */
 export function toIST(utcDate: Date): string {
-  const { year, month, day } = getISTDateParts(utcDate);
-  return `${year}-${month}-${day}`;
+  const istDate = new Date(utcDate.getTime() + IST_OFFSET_MS);
+  return format(istDate, DATE_FORMAT);
 }
 
 /**
@@ -181,12 +135,7 @@ export type TimeOfDayGreeting = 'Morning' | 'Afternoon' | 'Evening';
  * 5am–11:59am → Morning; 12pm–4:59pm → Afternoon; 5pm–4:59am → Evening.
  */
 export function getTimeOfDayGreeting(date = new Date()): TimeOfDayGreeting {
-  const { hour: hourPart } = getISTDateTimeParts(date);
-  const hour = Number.parseInt(hourPart, 10);
-
-  if (!Number.isFinite(hour)) {
-    return 'Evening';
-  }
+  const hour = date.getHours();
 
   if (hour >= 5 && hour < 12) {
     return 'Morning';

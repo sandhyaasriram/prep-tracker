@@ -2,12 +2,12 @@
  * Builds live Supabase context for the AI Coach and fallback briefs.
  */
 
-import { parseISO } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
 import { supabase } from '@/lib/supabase';
-import { PEAK_SEASON_START, WEEKLY_GOALS_TARGETS } from '@/constants';
-import { calculateStreak, daysSince, daysUntil, todayIST } from '@/utils';
-import type { CoachApplicationStage, CoachContext, CoachWeeklyGoal } from '@/types/coach';
+import { DATE_FORMAT, PEAK_SEASON_START, WEEKLY_GOALS_TARGETS } from '@/constants';
+import { calculateStreak, daysSince, daysUntil, getCurrentPhase, todayIST } from '@/utils';
+import type { CoachApplicationStage, CoachChatContext, CoachContext, CoachWeeklyGoal } from '@/types/coach';
 
 interface DSAProblemRow {
   name: string;
@@ -292,4 +292,38 @@ export async function buildCoachContext(userId: string): Promise<CoachContext> {
   };
 }
 
-export { generateCoachFallbackBrief } from '@/utils/coachPrompt';
+/**
+ * Compact live context for conversational coach requests.
+ */
+export async function buildCoachChatContext(userId: string): Promise<CoachChatContext & { firstName: string }> {
+  const context = await buildCoachContext(userId);
+  const today = todayIST();
+
+  const topicsNotTouchedIn7Days = [
+    ...new Set([...context.untouchedDsaTopics, ...context.topicsDueForRevision]),
+  ].slice(0, 8);
+
+  const upcomingDeadlines = context.upcomingDeadlines.map((deadline) => {
+    const company = deadline.title.split(' · ')[0] ?? deadline.title;
+    const date = format(addDays(parseISO(today), deadline.daysUntil), DATE_FORMAT);
+    return { company, date };
+  });
+
+  const activeApplicationsCount = context.applicationsByStage.reduce((sum, stage) => sum + stage.count, 0);
+
+  return {
+    firstName: context.firstName,
+    dsaSolvedThisWeek: context.dsaSolvedThisWeek,
+    dsaWeeklyTarget: context.dsaWeeklyTarget,
+    topicsNotTouchedIn7Days,
+    currentStreak: context.currentStreak,
+    upcomingDeadlines,
+    certificationsBehindSchedule: context.certificationsBehind.map((cert) => cert.name),
+    mocksThisWeek: context.mocksThisWeek,
+    weeklyGoalsCompleted: context.weeklyGoalsCompleted,
+    weeklyGoalsTotal: context.weeklyGoalsTotal,
+    activeApplicationsCount,
+    currentPhase: getCurrentPhase(profileSeed.phase_schedule),
+    daysUntilPeakSeason: context.daysUntilPeakSeason,
+  };
+}

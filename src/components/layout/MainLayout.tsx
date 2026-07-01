@@ -14,7 +14,7 @@ import { SkipLink } from '@/components/layout/SkipLink';
 import { CoachPanel } from '@/features/coach/CoachPanel';
 import { KeyboardShortcutsModal } from '@/features/help/KeyboardShortcutsModal';
 import { GlobalSearchModal } from '@/features/search/GlobalSearchModal';
-import { useGeminiCoach } from '@/hooks/useGeminiCoach';
+import { useCoachData } from '@/hooks/useCoachData';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/utils/storage';
 import { clearOAuthReturnParams, readOAuthReturnError, wasOAuthReturnSuccess } from '@/lib/googleExport';
@@ -80,7 +80,7 @@ export function MainLayout({
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { loading: settingsLoading } = useUserSettings(user.id);
-  const coach = useGeminiCoach(user.id, !settingsLoading);
+  const coach = useCoachData(!settingsLoading ? user.id : null);
 
   useEffect(() => {
     setSidebarCollapsedState(getSidebarCollapsed());
@@ -259,12 +259,13 @@ export function MainLayout({
       <CoachPanel
         isOpen={coachOpen}
         onClose={() => setCoachOpen(false)}
-        brief={coach.brief}
-        source={coach.source}
+        messages={coach.messages}
         loading={coach.loading}
+        sending={coach.sending}
         error={coach.error}
-        regenerationsRemaining={coach.regenerationsRemaining}
-        onRegenerate={coach.regenerateBrief}
+        onSend={coach.sendMessage}
+        onNewConversation={coach.startNewConversation}
+        onDismissError={coach.dismissError}
       />
 
       <GlobalSearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} userId={user.id} />

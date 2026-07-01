@@ -2,13 +2,19 @@
  * Shared progress calculations for nav bar and dashboard.
  */
 
+import { format } from 'date-fns';
 import profileSeed from '@/seed/profile.json';
-import { todayIST } from '@/utils';
+import { DATE_FORMAT, IST_OFFSET_MS } from '@/constants';
 
 interface WeeklyGoalLike {
   start_date: string;
   end_date: string;
   completed: boolean;
+}
+
+function todayIST(): string {
+  const istDate = new Date(Date.now() + IST_OFFSET_MS);
+  return format(istDate, DATE_FORMAT);
 }
 
 function chooseCurrentOrUpcomingGoal<T extends WeeklyGoalLike>(goals: T[], today: string): T | undefined {

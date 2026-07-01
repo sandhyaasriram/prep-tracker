@@ -5,10 +5,11 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { Download, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react';
 import { Button, Card, CardBody, CardHeader, Input } from '@/components';
-import { callCoachBrief } from '@/lib/gemini';
+import { callCoachChat } from '@/lib/gemini';
 import { supabase } from '@/lib/supabase';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import profileSeed from '@/seed/profile.json';
+import { buildCoachChatContext } from '@/utils/coachContext';
 import { downloadUserBackup, importUserBackup, resetUserData, type PlacementOSBackup } from '@/utils/dataBackup';
 import { getTheme } from '@/utils/storage';
 import type { User } from '@supabase/supabase-js';
@@ -81,7 +82,13 @@ export function SettingsPage({ user }: SettingsPageProps) {
         throw new Error('Not signed in');
       }
 
-      await callCoachBrief(token, true);
+      const { firstName, ...context } = await buildCoachChatContext(user.id);
+      await callCoachChat(token, {
+        userId: user.id,
+        messages: [],
+        context,
+        firstName,
+      });
       setCoachMessage('Connection successful — AI Coach responded.');
     } catch (testError) {
       setCoachMessage(testError instanceof Error ? testError.message : 'AI Coach test failed.');

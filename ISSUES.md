@@ -4,19 +4,19 @@ Tracked follow-ups that are not blockers but worth doing later.
 
 ---
 
-## AI Coach — improve prompt quality
+## AI Coach — iterate chat prompt quality
 
 **Status:** Open  
 **Phase:** 9 (AI Coach)  
-**Priority:** Medium
+**Priority:** Low
 
-The daily brief works (Groq + rules fallback), but the prompt can still be iterated for sharper output.
+Conversational coach chat is live (`coach_messages` + Groq). Prompt can still be tuned for sharper, more specific replies.
 
 **Where to change:**
-- **Groq prompt:** `supabase/functions/gemini-proxy/index.ts` → `buildPrompt()`
-- **Rules fallback copy:** `src/utils/coachPrompt.ts` → `generateCoachFallbackBrief()`
+- **Groq system prompt:** `supabase/functions/gemini-proxy/index.ts` → `buildSystemPrompt()`
+- **Live context assembly:** `src/utils/coachContext.ts` → `buildCoachChatContext()`
 
-**Acceptance:** Regenerated briefs feel specific to live data, not boilerplate; tasks are prioritized and time-estimated realistically.
+**Acceptance:** Replies feel specific to live data; opening brief and follow-ups prioritize realistically.
 
 ---
 
